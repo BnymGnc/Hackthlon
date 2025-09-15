@@ -16,14 +16,21 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework.routers import DefaultRouter
+from students.views import StudentViewSet
+from assessments.views import AssessmentViewSet
+from accounts.views import RegisterView, ProfileView
+from ai.views import AIRecommendView, AISummarizeView
+
+router = DefaultRouter()
+router.register(r'students', StudentViewSet, basename='student')
+router.register(r'assessments', AssessmentViewSet, basename='assessment')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/', include('django.contrib.auth.urls')),  # placeholder for future app urls
+    path('api/auth/register/', RegisterView.as_view(), name='auth_register'),
+    path('api/me/profile/', ProfileView.as_view(), name='me_profile'),
+    path('api/', include(router.urls)),
+    path('api/ai/recommend/', AIRecommendView.as_view(), name='ai_recommend'),
+    path('api/ai/summarize/', AISummarizeView.as_view(), name='ai_summarize'),
 ]
