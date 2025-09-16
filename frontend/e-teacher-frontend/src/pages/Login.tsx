@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Box, Button, Container, TextField, Typography, Alert, Paper } from '@mui/material'
+import api from '../lib/api'
 
 function Login() {
   const navigate = useNavigate()
@@ -14,8 +15,14 @@ function Login() {
     setLoading(true)
     setError(null)
     try {
-      // TODO: integrate with backend JWT endpoint
-      await new Promise((r) => setTimeout(r, 500))
+      const res = await api.post('/api/auth/token/', {
+        // backend expects username; we map email as username
+        username: email,
+        password,
+      })
+      const { access, refresh } = res.data
+      localStorage.setItem('access_token', access)
+      localStorage.setItem('refresh_token', refresh)
       navigate('/dashboard')
     } catch (err) {
       setError('Giriş başarısız')

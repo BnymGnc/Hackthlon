@@ -2,11 +2,51 @@ import { Typography, Paper, Box, TextField, Button, Stack, Drawer, IconButton, L
 import MenuOpenIcon from '@mui/icons-material/MenuOpen'
 import MenuIcon from '@mui/icons-material/Menu'
 import { useState } from 'react'
+import api from '../lib/api'
 
 function QuizGenerator() {
   const [drawerOpen, setDrawerOpen] = useState(true)
   const topics = ['Matematik - Türev', 'Fizik - Kinematik', 'Kimya - Asit Baz', 'Tarih - İnkılaplar']
   const histories = ['Quiz #12 - Türev', 'Quiz #11 - Kinematik', 'Quiz #10 - Asit Baz']
+  const [inputTopics, setInputTopics] = useState('')
+  const [numQuestions, setNumQuestions] = useState(10)
+  const [difficulty, setDifficulty] = useState('orta')
+  const [questions, setQuestions] = useState<{ q: string, a: string[], correct: string, explanation?: string }[]>([])
+  const [selected, setSelected] = useState<Record<string, string>>({})
+  const [score, setScore] = useState<number | null>(null)
+  const [showResults, setShowResults] = useState(false)
+
+  async function handleGenerate() {
+    const topicPayload = inputTopics?.trim() || ''
+    const { data } = await api.post('/api/ai/quiz/', { topics: topicPayload, num_questions: numQuestions, difficulty })
+    setQuestions(data.questions || [])
+    setSelected({})
+    setScore(null)
+    setShowResults(false)
+  }
+
+  function handleTopicClick(t: string) {
+    setInputTopics(t)
+    // generate immediately for quick UX
+    void (async () => {
+      const { data } = await api.post('/api/ai/quiz/', { topics: t, num_questions: numQuestions, difficulty })
+      setQuestions(data.questions || [])
+      setSelected({})
+      setScore(null)
+      setShowResults(false)
+    })()
+  }
+
+  function handleSelect(qIdx: number, choice: string) {
+    setSelected((s) => ({ ...s, [String(qIdx)]: choice }))
+  }
+
+  function handleSubmitQuiz() {
+    const total = questions.length
+    const correct = questions.reduce((acc, q, idx) => acc + (selected[String(idx)] === q.correct ? 1 : 0), 0)
+    setScore(Math.round((correct / Math.max(total, 1)) * 100))
+    setShowResults(true)
+  }
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -20,7 +60,7 @@ function QuizGenerator() {
           <List>
             {topics.map(t => (
               <ListItem key={t} disablePadding>
-                <ListItemButton>
+                <ListItemButton onClick={() => handleTopicClick(t)}>
                   <ListItemText primary={t} />
                 </ListItemButton>
               </ListItem>
@@ -51,16 +91,54 @@ function QuizGenerator() {
         <Paper sx={{ p: 3 }}>
           <Stack spacing={2}>
             <Typography variant="body1">Konu başlıklarını yaz; otomatik quiz soruları üretelim.</Typography>
-            <TextField label="Konu Başlıkları" multiline minRows={3} fullWidth />
+            <TextField label="Konu Başlıkları" multiline minRows={3} fullWidth value={inputTopics} onChange={(e) => setInputTopics(e.target.value)} />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField label="Soru Sayısı" type="number" inputProps={{ min: 1, max: 50 }} defaultValue={10} />
-              <TextField label="Zorluk" select SelectProps={{ native: true }} defaultValue="orta">
+              <TextField label="Soru Sayısı" type="number" inputProps={{ min: 1, max: 50 }} value={numQuestions} onChange={(e) => setNumQuestions(parseInt(e.target.value || '0'))} />
+              <TextField label="Zorluk" select SelectProps={{ native: true }} value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
                 <option value="kolay">Kolay</option>
                 <option value="orta">Orta</option>
                 <option value="zor">Zor</option>
               </TextField>
             </Stack>
-            <Button variant="contained">Quiz Oluştur</Button>
+            <Button variant="contained" onClick={handleGenerate} disabled={!inputTopics.trim()}>Quiz Oluştur</Button>
+            {questions.length > 0 && (
+              <Box>
+                {questions.map((qu, idx) => (
+                  <Paper key={idx} variant="outlined" sx={{ p: 2, mb: 1 }}>
+                    <Typography variant="subtitle2">{qu.q}</Typography>
+                    <List>
+                      {qu.a.map((opt, i) => (
+                        <ListItem key={i} disablePadding>
+                          <ListItemButton
+                            selected={selected[String(idx)] === opt}
+                            onClick={() => handleSelect(idx, opt)}
+                            sx={{
+                              bgcolor: showResults && opt === qu.correct ? 'success.light' :
+                                       showResults && selected[String(idx)] === opt && opt !== qu.correct ? 'error.light' : 'inherit'
+                            }}
+                          >
+                            <ListItemText primary={opt} />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                    {showResults && qu.explanation && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontStyle: 'italic' }}>
+                        Açıklama: {qu.explanation}
+                      </Typography>
+                    )}
+                  </Paper>
+                ))}
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  <Button variant="contained" onClick={handleSubmitQuiz}>Cevapları Gönder</Button>
+                  {score !== null && (
+                    <Typography variant="body2" color="text.secondary">
+                      Skor: {score} — Doğrular: {questions.reduce((acc, q, idx) => acc + (selected[String(idx)] === q.correct ? 1 : 0), 0)} / {questions.length}
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+            )}
           </Stack>
         </Paper>
       </Box>

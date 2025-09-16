@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { AppBar, Toolbar, Typography, Container, Box, IconButton, Button, Menu, MenuItem, Avatar, Tooltip, useTheme, Drawer, List, ListItem, ListItemButton, ListItemText, Divider } from '@mui/material'
 import SchoolIcon from '@mui/icons-material/School'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
@@ -7,6 +7,7 @@ import { useState } from 'react'
 
 function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
   const theme = useTheme()
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const open = Boolean(anchorEl)
@@ -61,7 +62,7 @@ function Layout() {
             <MenuItem onClick={() => { setDrawerOpen(true); handleClose() }}>Geçmiş</MenuItem>
             <MenuItem component={Link} to="/profile">Profil</MenuItem>
             <MenuItem component={Link} to="/settings">Ayarlar</MenuItem>
-            <MenuItem>Çıkış Yap</MenuItem>
+            <MenuItem onClick={() => { localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token'); setDrawerOpen(false); handleClose(); navigate('/login') }}>Çıkış Yap</MenuItem>
           </Menu>
         </Toolbar>
       </AppBar>

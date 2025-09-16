@@ -19,6 +19,11 @@ import ExamAnalysis from './pages/ExamAnalysis'
 import HistoryChats from './pages/HistoryChats'
 import HistoryEvents from './pages/HistoryEvents'
 
+function requireAuth(element: JSX.Element) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+  return token ? element : <Navigate to="/login" replace />
+}
+
 const router = createBrowserRouter([
   { path: '/', element: <App /> },
   { path: '/login', element: <Login /> },
@@ -28,16 +33,16 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: 'dashboard', element: <Dashboard /> },
-      { path: 'career', element: <CareerRoadmap /> },
-      { path: 'reports', element: <StudyReports /> },
-      { path: 'schedule', element: <StudySchedule /> },
-      { path: 'quiz', element: <QuizGenerator /> },
-      { path: 'summary', element: <DocumentSummary /> },
-      { path: 'support', element: <PsychologicalSupport /> },
-      { path: 'analysis', element: <ExamAnalysis /> },
-      { path: 'history/chats', element: <HistoryChats /> },
-      { path: 'history/events', element: <HistoryEvents /> },
+      { path: 'dashboard', element: requireAuth(<Dashboard />) },
+      { path: 'career', element: requireAuth(<CareerRoadmap />) },
+      { path: 'reports', element: requireAuth(<StudyReports />) },
+      { path: 'schedule', element: requireAuth(<StudySchedule />) },
+      { path: 'quiz', element: requireAuth(<QuizGenerator />) },
+      { path: 'summary', element: requireAuth(<DocumentSummary />) },
+      { path: 'support', element: requireAuth(<PsychologicalSupport />) },
+      { path: 'analysis', element: requireAuth(<ExamAnalysis />) },
+      { path: 'history/chats', element: requireAuth(<HistoryChats />) },
+      { path: 'history/events', element: requireAuth(<HistoryEvents />) },
     ],
   },
 ])

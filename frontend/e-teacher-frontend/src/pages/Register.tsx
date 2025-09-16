@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Box, Button, Container, TextField, Typography, Alert, Paper } from '@mui/material'
+import api from '../lib/api'
 
 function Register() {
   const navigate = useNavigate()
@@ -19,11 +20,12 @@ function Register() {
     }
     setLoading(true)
     try {
-      // TODO: integrate register endpoint
-      await new Promise((r) => setTimeout(r, 500))
+      const username = email
+      await api.post('/api/auth/register/', { username, email, password })
       navigate('/login')
-    } catch (err) {
-      setError('Kayıt başarısız')
+    } catch (err: any) {
+      const msg = err?.response?.data?.email || err?.response?.data?.username || err?.response?.data?.detail || 'Kayıt başarısız'
+      setError(Array.isArray(msg) ? msg.join(', ') : (typeof msg === 'string' ? msg : 'Kayıt başarısız'))
     } finally {
       setLoading(false)
     }

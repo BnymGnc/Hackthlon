@@ -1,8 +1,11 @@
 from rest_framework import permissions, status, generics
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import UserProfile
-from rest_framework.serializers import ModelSerializer, CharField, EmailField
+from .models import UserProfile, CareerRoadmap
+from rest_framework.serializers import ModelSerializer, CharField, EmailField, ListField, ValidationError
+from rest_framework import views
+import os
+import requests
 
 
 class RegisterSerializer(ModelSerializer):
@@ -21,6 +24,15 @@ class RegisterSerializer(ModelSerializer):
         )
         UserProfile.objects.create(user=user)
         return user
+
+    def validate(self, attrs):
+        username = attrs.get("username")
+        email = attrs.get("email")
+        if User.objects.filter(username=username).exists():
+            raise ValidationError({"username": "Bu kullanıcı adı zaten kullanımda"})
+        if User.objects.filter(email=email).exists():
+            raise ValidationError({"email": "Bu e-posta ile kayıt zaten var"})
+        return attrs
 
 
 class RegisterView(generics.CreateAPIView):
@@ -46,3 +58,62 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         return profile
 
 # Create your views here.
+
+
+class CareerRoadmapSerializer(ModelSerializer):
+    class Meta:
+        model = CareerRoadmap
+        fields = ["id", "interests", "strengths", "goals", "recommendations", "created_at"]
+
+
+class SaveCareerRoadmapView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        interests = request.data.get('interests', '')
+        strengths = request.data.get('strengths', '')
+        goals = request.data.get('goals', '')
+
+        # Try to call internal AI recommend endpoint
+        recs = []
+        try:
+            base = os.getenv('EXTERNAL_BASE_URL') or 'http://127.0.0.1:8000'
+            headers = { 'Authorization': request.headers.get('Authorization', '') }
+            prompt = f"İlgi alanları: {interests}\nGüçlü yönler: {strengths}\nHedefler: {goals}\nÖğrenci için 5 kısa kariyer önerisi ver."
+            resp = requests.post(f"{base}/api/ai/recommend/", json={ 'prompt': prompt }, headers=headers, timeout=10)
+            if resp.ok:
+                txt = resp.json().get('result', '')
+                # naive split lines into recommendations
+                for line in txt.splitlines():
+                    line = line.strip('- ').strip()
+                    if line:
+                        recs.append(line)
+                recs = recs[:5] if recs else []
+        except Exception:
+            pass
+
+        if not recs:
+            recs = [
+                "Yazılım Mühendisliği",
+                "Veri Bilimi",
+                "Endüstri Mühendisliği",
+                "Psikoloji",
+            ]
+
+        roadmap = CareerRoadmap.objects.create(
+            user=request.user,
+            interests=interests,
+            strengths=strengths,
+            goals=goals,
+            recommendations=recs,
+        )
+        serializer = CareerRoadmapSerializer(roadmap)
+        return Response({"ok": True, "recommendations": recs, "roadmap": serializer.data})
+
+
+class CareerRoadmapListView(generics.ListAPIView):
+    serializer_class = CareerRoadmapSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return CareerRoadmap.objects.filter(user=self.request.user).order_by('-created_at')
