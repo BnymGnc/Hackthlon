@@ -20,6 +20,7 @@ function CareerRoadmap() {
   const [loading, setLoading] = useState(false)
   const [recommendations, setRecommendations] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [savedRoadmaps, setSavedRoadmaps] = useState<any[]>([])
   const [formData, setFormData] = useState<FormData>({
     interests: '',
     strengths: '',
@@ -52,6 +53,10 @@ function CareerRoadmap() {
     try {
       const { data } = await api.post('/api/profiles/save_career_roadmap/', formData)
       setRecommendations(data.recommendations || [])
+      try {
+        const list = await api.get('/api/me/roadmaps/')
+        setSavedRoadmaps(list.data || [])
+      } catch {}
       
       if (activeStep < steps.length - 1) {
         setActiveStep(steps.length - 1)
@@ -176,6 +181,21 @@ function CareerRoadmap() {
           ))}
         </Stepper>
       </Paper>
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="subtitle1" sx={{ mb: 1 }}>Son Yol Haritası Özeti</Typography>
+        {savedRoadmaps.length > 0 ? (
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="body2" color="text.secondary">{savedRoadmaps[0]?.goals || 'Hedefler girilmedi'}</Typography>
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              {(savedRoadmaps[0]?.recommendations || []).slice(0, 5).map((r: string, i: number) => (
+                <Chip key={i} label={r} size="small" />
+              ))}
+            </Stack>
+          </Paper>
+        ) : (
+          <Typography variant="body2" color="text.secondary">Henüz yol haritası yok.</Typography>
+        )}
+      </Box>
     </Box>
   )
 }

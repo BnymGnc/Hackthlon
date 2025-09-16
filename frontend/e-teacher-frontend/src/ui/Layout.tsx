@@ -1,9 +1,11 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { AppBar, Toolbar, Typography, Container, Box, IconButton, Button, Menu, MenuItem, Avatar, Tooltip, useTheme, Drawer, List, ListItem, ListItemButton, ListItemText, Divider } from '@mui/material'
+import { AppBar, Toolbar, Typography, Container, Box, IconButton, Button, Menu, MenuItem, Avatar, Tooltip, useTheme, Drawer, List, ListItem, ListItemButton, ListItemText, Divider, Chip } from '@mui/material'
+import { useEffect, useState } from 'react'
+import api from '../lib/api'
 import SchoolIcon from '@mui/icons-material/School'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
-import { useState } from 'react'
+// removed duplicate useState import
 
 function Layout() {
   const location = useLocation()
@@ -14,6 +16,17 @@ function Layout() {
   const handleOpen = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget)
   const handleClose = () => setAnchorEl(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [recent, setRecent] = useState<any[]>([])
+  useEffect(() => {
+    async function loadRecent() {
+      try {
+        const { data } = await api.get('/api/assessments/')
+        const items = (data || []).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 8)
+        setRecent(items)
+      } catch {}
+    }
+    if (drawerOpen) loadRecent()
+  }, [drawerOpen])
   const links = [
     { to: '/dashboard', label: 'Panel' },
     { to: '/career', label: 'Kariyer' },
@@ -30,16 +43,17 @@ function Layout() {
   return (
     <Box>
       <AppBar position="fixed" color="inherit" elevation={1} sx={{ backdropFilter: 'blur(6px)' }}>
-        <Toolbar>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton edge="start" color="primary" component={Link} to="/dashboard">
+        <Toolbar sx={{ position: 'relative' }}>
+          <Box sx={{ position: 'absolute', left: 16 }} />
+          <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 1, zIndex: 1 }}>
+            <IconButton color="primary" component={Link} to="/dashboard" sx={{ p: 0 }}>
               <SchoolIcon />
             </IconButton>
             <Typography variant="h6" component={Link} to="/dashboard" color="inherit" sx={{ textDecoration: 'none' }}>
               E-Teacher
             </Typography>
           </Box>
-          <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ mr: 1 }}>
             <Button color="inherit" onClick={(e) => setMenuEl(e.currentTarget)}>Özellikler</Button>
             <Menu anchorEl={menuEl} open={menuOpen} onClose={() => setMenuEl(null)}>
@@ -73,26 +87,29 @@ function Layout() {
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <Box sx={{ width: 320, p: 2 }} role="presentation">
           <Typography variant="h6" sx={{ mb: 1 }}>Geçmiş</Typography>
-          <Typography variant="overline" color="text.secondary">Sohbetler</Typography>
           <List>
-            {[{id:1,title:'Matematik çalışma planı'},{id:2,title:'Fizik özet talebi'}].map(item => (
-              <ListItem key={item.id} disablePadding>
-                <ListItemButton onClick={() => setDrawerOpen(false)}>
-                  <ListItemText primary={item.title} />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-          <Divider sx={{ my: 1 }} />
-          <Typography variant="overline" color="text.secondary">Özetler</Typography>
-          <List>
-            {[{id:10,title:'Biyoloji hücre özeti'},{id:11,title:'Tarih inkılaplar özeti'}].map(item => (
-              <ListItem key={item.id} disablePadding>
-                <ListItemButton onClick={() => setDrawerOpen(false)}>
-                  <ListItemText primary={item.title} />
-                </ListItemButton>
-              </ListItem>
-            ))}
+            {recent.map((a) => {
+              const t = String(a.title || '')
+              let type: 'quiz'|'chat'|'support'|'report'|'schedule'|'other' = 'other'
+              let to = '/dashboard'
+              if (/quiz/i.test(t)) { type = 'quiz'; to = '/quiz' }
+              else if (/chat/i.test(t)) { type = 'chat'; to = '/chat' }
+              else if (/psychsupport|support/i.test(t)) { type = 'support'; to = '/support' }
+              else if (/report|rapor/i.test(t)) { type = 'report'; to = '/reports' }
+              else if (/schedule|program/i.test(t)) { type = 'schedule'; to = '/schedule' }
+              const color = type === 'quiz' ? 'primary' : type === 'chat' ? 'secondary' : type === 'support' ? 'success' : type === 'report' ? 'warning' : type === 'schedule' ? 'info' : 'default'
+              const label = type === 'quiz' ? 'Quiz' : type === 'chat' ? 'Sohbet' : type === 'support' ? 'Destek' : type === 'report' ? 'Rapor' : type === 'schedule' ? 'Program' : 'Diğer'
+              return (
+                <ListItem key={a.id} disablePadding>
+                  <ListItemButton onClick={() => { setDrawerOpen(false); navigate(to) }}>
+                    <ListItemText primary={<Box sx={{ display:'flex', alignItems:'center', gap: 1 }}><Chip size="small" label={label} color={color as any} variant="outlined" /> <span>{t}</span></Box>} secondary={new Date(a.created_at).toLocaleString()} />
+                  </ListItemButton>
+                </ListItem>
+              )
+            })}
+            {recent.length === 0 && (
+              <ListItem><ListItemText primary="Kayıt bulunamadı" /></ListItem>
+            )}
           </List>
         </Box>
       </Drawer>

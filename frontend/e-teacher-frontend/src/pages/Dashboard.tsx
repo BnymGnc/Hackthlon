@@ -11,69 +11,23 @@ import PsychologyOutlinedIcon from '@mui/icons-material/PsychologyOutlined'
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
 
 function Dashboard() {
-  const [roadmaps, setRoadmaps] = useState<any[]>([])
-  const [latestQuiz, setLatestQuiz] = useState<any | null>(null)
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const [rmRes, asmtRes] = await Promise.all([
-          api.get('/api/me/roadmaps/'),
-          api.get('/api/assessments/'),
-        ])
-        setRoadmaps(rmRes.data || [])
-        const assessments = asmtRes.data || []
-        const quiz = assessments.find((a: any) => a.title?.toLowerCase().includes('quiz'))
-        setLatestQuiz(quiz || null)
-      } catch (e) {
-        // ignore
-      }
-    }
-    load()
-  }, [])
+  useEffect(() => { /* no-op: removed heavy dashboard calls */ }, [])
   const tiles = [
-    { title: 'Kariyer Yol Haritası', desc: 'İlgi ve sonuçlara göre öneriler', to: '/career', icon: <SchoolOutlinedIcon color="primary" /> },
     { title: 'Kişisel Çalışma Raporları', desc: 'Güçlü ve zayıf yönler', to: '/reports', icon: <TimelineOutlinedIcon color="primary" /> },
     { title: 'Ders Programı Önerisi', desc: 'Verimli haftalık plan', to: '/schedule', icon: <ScheduleOutlinedIcon color="primary" /> },
     { title: 'Quiz Oluşturma', desc: 'Konu başlığından quiz üret', to: '/quiz', icon: <QuizOutlinedIcon color="primary" /> },
     { title: 'Belge Özeti', desc: 'Notlardan kısa özet', to: '/summary', icon: <ArticleOutlinedIcon color="primary" /> },
     { title: 'Psikolojik Destek', desc: 'Motivasyon ve destek', to: '/support', icon: <PsychologyOutlinedIcon color="primary" /> },
+    { title: 'Kariyer Önerileri', desc: 'İlgi ve sonuçlara göre', to: '/career', icon: <SchoolOutlinedIcon color="primary" /> },
   ]
 
   return (
     <>
-      <Typography variant="h5" gutterBottom>Panel</Typography>
+      <Typography variant="h5" align="center" gutterBottom>E-Teacher</Typography>
       <Typography variant="body1" sx={{ mb: 2 }}>
         Hoş geldin! Buradan tüm özelliklere erişebilirsin.
       </Typography>
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>Son Yol Haritaları</Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              {roadmaps.slice(0, 8).map((r, idx) => (
-                <Chip key={idx} label={(r.recommendations?.[0]) || 'Öneri'} sx={{ mb: 1 }} />
-              ))}
-              {roadmaps.length === 0 && (
-                <Typography variant="body2" color="text.secondary">Henüz yol haritası yok. <Button size="small" component={Link} to="/career">Oluştur</Button></Typography>
-              )}
-            </Stack>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>Son Quiz</Typography>
-            {latestQuiz ? (
-              <>
-                <Typography variant="body2" color="text.secondary">{latestQuiz.title}</Typography>
-                <Button size="small" component={Link} to="/quiz" sx={{ mt: 1 }}>Quizleri Gör</Button>
-              </>
-            ) : (
-              <Typography variant="body2" color="text.secondary">Henüz quiz oluşturulmadı. <Button size="small" component={Link} to="/quiz">Oluştur</Button></Typography>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
+      <Grid container spacing={2} sx={{ mb: 2 }} />
       <Grid container spacing={3} alignItems="stretch">
         {tiles.map((t) => (
           <Grid item xs={12} sm={6} md={4} key={t.title}>

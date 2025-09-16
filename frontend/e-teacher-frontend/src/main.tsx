@@ -1,4 +1,5 @@
 import { StrictMode } from 'react'
+import type { ReactElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material'
@@ -16,10 +17,12 @@ import QuizGenerator from './pages/QuizGenerator'
 import DocumentSummary from './pages/DocumentSummary'
 import PsychologicalSupport from './pages/PsychologicalSupport'
 import ExamAnalysis from './pages/ExamAnalysis'
-import HistoryChats from './pages/HistoryChats'
 import HistoryEvents from './pages/HistoryEvents'
+import Profile from './pages/Profile'
+import Settings from './pages/Settings'
+import Chat from './pages/Chat'
 
-function requireAuth(element: JSX.Element) {
+function requireAuth(element: ReactElement) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
   return token ? element : <Navigate to="/login" replace />
 }
@@ -41,8 +44,11 @@ const router = createBrowserRouter([
       { path: 'summary', element: requireAuth(<DocumentSummary />) },
       { path: 'support', element: requireAuth(<PsychologicalSupport />) },
       { path: 'analysis', element: requireAuth(<ExamAnalysis />) },
-      { path: 'history/chats', element: requireAuth(<HistoryChats />) },
+      // history/chats removed; use Chat page instead
       { path: 'history/events', element: requireAuth(<HistoryEvents />) },
+      { path: 'profile', element: requireAuth(<Profile />) },
+      { path: 'settings', element: requireAuth(<Settings />) },
+      { path: 'chat', element: requireAuth(<Chat />) },
     ],
   },
 ])

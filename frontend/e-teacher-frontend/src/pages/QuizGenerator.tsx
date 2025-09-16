@@ -1,4 +1,4 @@
-import { Typography, Paper, Box, TextField, Button, Stack, Drawer, IconButton, List, ListItem, ListItemButton, ListItemText, Divider, Tooltip } from '@mui/material'
+import { Typography, Paper, Box, TextField, Button, Stack, Drawer, IconButton, List, ListItem, ListItemButton, ListItemText, Divider, Tooltip, Alert, Chip } from '@mui/material'
 import MenuOpenIcon from '@mui/icons-material/MenuOpen'
 import MenuIcon from '@mui/icons-material/Menu'
 import { useState } from 'react'
@@ -15,14 +15,31 @@ function QuizGenerator() {
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [score, setScore] = useState<number | null>(null)
   const [showResults, setShowResults] = useState(false)
+  const [avg, setAvg] = useState<number | null>(null)
+  const [topicStats, setTopicStats] = useState<{ topic: string, accuracy: number, total: number }[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  async function loadStats() {
+    try {
+      const { data } = await api.get('/api/assessments-actions/quiz-stats/')
+      setAvg(typeof data.average === 'number' ? data.average : null)
+      setTopicStats(Array.isArray(data.topics) ? data.topics : [])
+    } catch {}
+  }
 
   async function handleGenerate() {
+    setError(null)
     const topicPayload = inputTopics?.trim() || ''
-    const { data } = await api.post('/api/ai/quiz/', { topics: topicPayload, num_questions: numQuestions, difficulty })
-    setQuestions(data.questions || [])
-    setSelected({})
-    setScore(null)
-    setShowResults(false)
+    try {
+      const { data } = await api.post('/api/ai/quiz/', { topics: topicPayload, num_questions: numQuestions, difficulty })
+      setQuestions(data.questions || [])
+      setSelected({})
+      setScore(null)
+      setShowResults(false)
+      void loadStats()
+    } catch (e) {
+      setError('Quiz oluşturulamadı')
+    }
   }
 
   function handleTopicClick(t: string) {
@@ -46,6 +63,17 @@ function QuizGenerator() {
     const correct = questions.reduce((acc, q, idx) => acc + (selected[String(idx)] === q.correct ? 1 : 0), 0)
     setScore(Math.round((correct / Math.max(total, 1)) * 100))
     setShowResults(true)
+    void (async () => {
+      try {
+        await api.post('/api/assessments-actions/save-quiz/', {
+          topics: inputTopics,
+          questions,
+          selected,
+          score: Math.round((correct / Math.max(total, 1)) * 100),
+        })
+        void loadStats()
+      } catch {}
+    })()
   }
 
   return (
@@ -87,9 +115,19 @@ function QuizGenerator() {
             </Tooltip>
           )}
           <Typography variant="h5" gutterBottom>Quiz Oluşturma</Typography>
+          {avg !== null && (
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>Geçmiş Ortalama: {avg}%</Typography>
+          )}
         </Box>
         <Paper sx={{ p: 3 }}>
           <Stack spacing={2}>
+            {topicStats.length > 0 && (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {topicStats.slice(0, 8).map(t => (
+                  <Chip key={t.topic} label={`${t.topic}: ${t.accuracy}%`} size="small" />
+                ))}
+              </Stack>
+            )}
             <Typography variant="body1">Konu başlıklarını yaz; otomatik quiz soruları üretelim.</Typography>
             <TextField label="Konu Başlıkları" multiline minRows={3} fullWidth value={inputTopics} onChange={(e) => setInputTopics(e.target.value)} />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -100,6 +138,7 @@ function QuizGenerator() {
                 <option value="zor">Zor</option>
               </TextField>
             </Stack>
+            {error && <Alert severity="error">{error}</Alert>}
             <Button variant="contained" onClick={handleGenerate} disabled={!inputTopics.trim()}>Quiz Oluştur</Button>
             {questions.length > 0 && (
               <Box>

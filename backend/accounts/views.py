@@ -6,6 +6,8 @@ from rest_framework.serializers import ModelSerializer, CharField, EmailField, L
 from rest_framework import views
 import os
 import requests
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 
 class RegisterSerializer(ModelSerializer):
@@ -117,3 +119,24 @@ class CareerRoadmapListView(generics.ListAPIView):
 
     def get_queryset(self):
         return CareerRoadmap.objects.filter(user=self.request.user).order_by('-created_at')
+
+
+class EmailOrUsernameTokenSerializer(TokenObtainPairSerializer):
+    username_field = User.USERNAME_FIELD
+
+    def validate(self, attrs):
+        username = attrs.get('username')
+        password = attrs.get('password')
+        # If username looks like email, map to actual username
+        if username and '@' in username:
+            try:
+                user = User.objects.get(email__iexact=username)
+                attrs['username'] = getattr(user, self.username_field)
+            except User.DoesNotExist:
+                pass
+        return super().validate(attrs)
+
+
+class EmailOrUsernameTokenObtainPairView(TokenObtainPairView):
+    serializer_class = EmailOrUsernameTokenSerializer
+    permission_classes = [permissions.AllowAny]
