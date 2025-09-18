@@ -1,4 +1,4 @@
-import { Typography, Paper, Box, TextField, Button, Stack, Alert, Chip, MenuItem, Select, InputLabel, FormControl, IconButton, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material'
+import { Typography, Paper, Box, TextField, Button, Stack, Alert, MenuItem, Select, InputLabel, FormControl, IconButton, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material'
 import { Add, Remove, Save, Cancel } from '@mui/icons-material'
 import { useMemo, useState, useEffect } from 'react'
 import api from '../lib/api'
@@ -927,8 +927,8 @@ function StudySchedule() {
             </Box>
           </Typography>
           <Box sx={{ overflowX: 'auto' }}>
-            <Box sx={{ display: 'flex', gap: 8/8, minWidth: 8 * 120 }}>
-              <Box sx={{ minWidth: 120 }}>
+            <Box sx={{ display: 'flex', gap: 8/8, minWidth: 8 * 130 }}>
+              <Box sx={{ minWidth: 130 }}>
                 <Paper variant="outlined" sx={{ p: 1, borderRadius: 2 }}>
                   <Box sx={{ mb: 1, p: 1, borderRadius: 1.5, textAlign: 'center', fontWeight: 600, bgcolor: 'action.hover' }}>Saat</Box>
                   <Stack spacing={0.75}>
@@ -941,7 +941,7 @@ function StudySchedule() {
                 </Paper>
               </Box>
               {days.map((d) => (
-                <Box key={d} sx={{ minWidth: 120 }}>
+                <Box key={d} sx={{ minWidth: 130 }}>
                   <Paper variant="outlined" sx={{ p: 1, borderRadius: 2 }}>
                     <Box onClick={() => toggleDayHeader(d)} 
                       sx={{ 
@@ -990,9 +990,9 @@ function StudySchedule() {
           </Box>
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>Ders Ekle</Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ my: 1 }}>
               {courseList.map(c => (
-                <Stack key={c} direction="row" spacing={1} alignItems="center" sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+                <Stack key={c} direction="row" spacing={1} alignItems="center" sx={{ p: 1, my: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
                   draggable
                   onDragStart={() => onDragStartCourse(c)}
                   onDragEnd={onDragEndCourse}
@@ -1062,6 +1062,61 @@ function StudySchedule() {
               ))}
             </Stack>
           </Box>
+          {/* Ders Ekle bölümü lise derslerinin altına taşındı */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Ders Ekle</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ my: 1 }}>
+              {courseList.map(c => (
+                <Stack key={c} direction="row" spacing={1} alignItems="center" sx={{ p: 1, my: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+                  draggable
+                  onDragStart={() => onDragStartCourse(c)}
+                  onDragEnd={onDragEndCourse}
+                >
+                  <Typography variant="caption" sx={{ minWidth: 80 }}>{c}</Typography>
+                  <TextField size="small" type="number" inputProps={{ min: 0, max: 10 }} sx={{ width: 72 }}
+                    value={selectedSubjects[c] || ''}
+                    onChange={(e) => setSelectedSubjects((prev) => ({ ...prev, [c]: Math.max(0, Math.min(10, parseInt(e.target.value || '0'))) }))}
+                    placeholder="saat" />
+                  <IconButton size="small" onClick={() => adjustSubjectHours(c, -1)} disabled={(selectedSubjects[c] || 0) <= 0}>
+                    <Remove fontSize="small" />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => adjustSubjectHours(c, 1)} disabled={(selectedSubjects[c] || 0) >= 10}>
+                    <Add fontSize="small" />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => { setCourseList(l => l.filter(x => x !== c)); setSelectedSubjects(prev => { const cp = { ...prev }; delete cp[c]; return cp }) }} color="error">
+                    <Cancel fontSize="small" />
+                  </IconButton>
+                </Stack>
+              ))}
+              {courseList.length === 0 && (
+                <Typography variant="caption" color="text.secondary">Henüz ders eklenmedi</Typography>
+              )}
+            </Stack>
+            {draggingCourse && (
+              <Box onDragOver={allowDrop} onDrop={(e) => { e.preventDefault(); dropToTrash() }}
+                  sx={{ mt: 1, p: 1, border: '2px dashed', borderColor: 'error.main', color: 'error.main', borderRadius: 1, textAlign: 'center' }}>
+                  Bırak to remove: {draggingCourse}
+                </Box>
+            )}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" sx={{ mt: 1 }}>
+              <TextField size="small" label="Ders adı" value={courseInput} onChange={(e) => setCourseInput(e.target.value)} />
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>Haftalık Saat</InputLabel>
+                <Select label="Haftalık Saat" value={courseHours} onChange={(e) => setCourseHours(Number(e.target.value))}>
+                  {[1,2,3,4,5,6,7,8,9,10].map(h => <MenuItem key={h} value={h}>{h}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <Button variant="outlined" onClick={() => {
+                const v = courseInput.trim()
+                if (!v || courseHours <= 0) return
+                setSelectedSubjects(prev => ({ ...prev, [v]: (prev[v] || 0) + courseHours }))
+                if (!courseList.includes(v)) setCourseList(l => [...l, v])
+                setCourseInput('')
+                setCourseHours(1)
+              }}>Ekle</Button>
+              <Button variant="text" color="error" onClick={() => { setCourseList([]); setSelectedSubjects({}) }}>Temizle</Button>
+            </Stack>
+          </Box>
           {/* Müsait Günler kaldırıldı: grid üzerinden belirleniyor */}
           {avg !== null && (
             <Typography variant="caption" color="text.secondary">Quiz ortalaması: {avg} — {avg < 50 ? 'Sarı saatlerde de ders planlanabilir' : 'Yalnızca yeşil saatler kullanılacak'}</Typography>
@@ -1109,21 +1164,21 @@ function StudySchedule() {
                       {new Date(savedSchedule.created_at || savedSchedule.schedule?.createdAt).toLocaleDateString('tr-TR')}
                     </Typography>
                   </Stack>
-                  <Table size="small">
+                  <Table size="small" sx={{ borderCollapse: 'separate', borderSpacing: 0 }}>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Saat</TableCell>
-                        {days.map(d => (
-                          <TableCell key={d}>{d}</TableCell>
+                        <TableCell sx={{ borderRight: '1px solid', borderColor: 'divider', fontWeight: 600 }}>Saat</TableCell>
+                        {days.map((d, i) => (
+                          <TableCell key={d} sx={{ borderRight: i < days.length - 1 ? '1px solid' : 'none', borderColor: 'divider', fontWeight: 600 }}>{d}</TableCell>
                         ))}
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {hours.map(h => (
                         <TableRow key={h}>
-                          <TableCell sx={{ fontWeight: 600 }}>{String(h).padStart(2,'0')}:00</TableCell>
-                          {days.map(d => (
-                            <TableCell key={`${d}-${h}`}>{cellMap[`${d}-${h}`] || ''}</TableCell>
+                          <TableCell sx={{ fontWeight: 600, borderRight: '1px solid', borderColor: 'divider' }}>{String(h).padStart(2,'0')}:00</TableCell>
+                          {days.map((d, i) => (
+                            <TableCell key={`${d}-${h}`} sx={{ borderRight: i < days.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>{cellMap[`${d}-${h}`] || ''}</TableCell>
                           ))}
                         </TableRow>
                       ))}

@@ -21,7 +21,7 @@ import Profile from './pages/Profile'
 import SavedSchedule from './pages/SavedSchedule'
 import Settings from './pages/Settings'
 import Chat from './pages/Chat'
-// DailyStudyReport removed per request
+import DailyStudyReport from './pages/DailyStudyReport'
 
 function requireAuth(element: ReactElement) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
@@ -50,7 +50,7 @@ const router = createBrowserRouter([
       { path: 'saved-schedule', element: requireAuth(<SavedSchedule />) },
       { path: 'settings', element: requireAuth(<Settings />) },
       { path: 'chat', element: requireAuth(<Chat />) },
-      // daily-report route removed per request
+      { path: 'daily-report', element: requireAuth(<DailyStudyReport />) },
     ],
   },
 ])

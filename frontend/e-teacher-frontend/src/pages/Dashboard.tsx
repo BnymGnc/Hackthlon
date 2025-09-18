@@ -14,6 +14,7 @@ function Dashboard() {
   useEffect(() => { /* no-op: removed heavy dashboard calls */ }, [])
   const tiles = [
     { title: 'Ders Programı Önerisi', desc: 'Verimli haftalık plan', to: '/schedule', icon: <ScheduleOutlinedIcon color="primary" /> },
+    { title: 'Günlük Rapor', desc: 'Bugünün planı, puan ve AI analizi', to: '/daily-report', icon: <TimelineOutlinedIcon color="primary" /> },
     { title: 'Quiz Oluşturma', desc: 'Konu başlığından quiz üret', to: '/quiz', icon: <QuizOutlinedIcon color="primary" /> },
     { title: 'Belge Özeti', desc: 'Notlardan kısa özet', to: '/summary', icon: <ArticleOutlinedIcon color="primary" /> },
     { title: 'Psikolojik Destek', desc: 'Motivasyon ve destek', to: '/support', icon: <PsychologyOutlinedIcon color="primary" /> },

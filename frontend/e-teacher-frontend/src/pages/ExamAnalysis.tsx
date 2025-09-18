@@ -1,4 +1,4 @@
-import { Typography, Paper, Box, TextField, Button, Stack, Grid, MenuItem, Alert, FormControl, InputLabel, Select } from '@mui/material'
+import { Typography, Paper, Box, TextField, Button, Stack, MenuItem, Alert, FormControl, InputLabel, Select } from '@mui/material'
 import { useState, useEffect } from 'react'
 import api from '../lib/api'
 
@@ -135,7 +135,7 @@ function ExamAnalysis() {
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>Sınav Sonucu Analizi</Typography>
+      <Typography variant="h5" gutterBottom>Deneme Analizi</Typography>
       <Paper sx={{ p: 3 }}>
         <Stack spacing={2}>
           <Typography variant="body1">TYT/AYT için ders bazlı doğru, boş ve yanlışlarını gir; netleri otomatik hesaplayalım.</Typography>
@@ -159,48 +159,42 @@ function ExamAnalysis() {
               </FormControl>
             )}
           </Stack>
-          <Grid container spacing={3}>
+          <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: '1fr' }, width: '100%' }}>
             {subjects.map((s, idx) => (
-              <Grid item xs={12} md={12} key={idx}>
+              <Box key={idx} sx={{ width: '100%' }}>
                 <Paper variant="outlined" sx={{ p: 3, width: '100%', overflow: 'hidden', borderRadius: 2 }}>
                   <Stack spacing={1}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{s.name}</Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={4}><TextField label="Doğru" type="number" value={s.dogru} onChange={(e) => updateSubject(idx, 'dogru', e.target.value)} fullWidth /></Grid>
-                      <Grid item xs={12} sm={4}><TextField label="Boş" type="number" value={s.blank} onChange={(e) => updateSubject(idx, 'blank', e.target.value)} fullWidth /></Grid>
-                      <Grid item xs={12} sm={4}><TextField label="Yanlış" type="number" value={s.wrong} onChange={(e) => updateSubject(idx, 'wrong', e.target.value)} fullWidth /></Grid>
-                    </Grid>
+                    <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' } }}>
+                      <TextField label="Doğru" type="number" value={s.dogru} onChange={(e) => updateSubject(idx, 'dogru', e.target.value)} fullWidth />
+                      <TextField label="Boş" type="number" value={s.blank} onChange={(e) => updateSubject(idx, 'blank', e.target.value)} fullWidth />
+                      <TextField label="Yanlış" type="number" value={s.wrong} onChange={(e) => updateSubject(idx, 'wrong', e.target.value)} fullWidth />
+                    </Box>
                     <Typography variant="caption" color="text.secondary">Toplam: {s.dogru + s.blank + s.wrong} / {getSubjectLimit(s.name)} — Net: {computedNets[idx]?.net.toFixed(2)}</Typography>
                   </Stack>
                 </Paper>
-              </Grid>
+              </Box>
             ))}
-          </Grid>
+          </Box>
           <Typography variant="subtitle2">Toplam Net: {totalNet.toFixed(2)}</Typography>
           <TextField label="Hedefler / Notlar" multiline minRows={2} value={goals} onChange={(e) => setGoals(e.target.value)} />
           <Button variant="contained" onClick={handleAnalyze} disabled={loading}>Analiz Et</Button>
           {error && <Alert severity="error">{error}</Alert>}
           {result && (
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="subtitle1">Öncelikli Konular</Typography>
-                  <ul>{result.topics_to_focus.map((t, i) => <li key={i}>{t}</li>)}</ul>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="subtitle1">Çalışma Planı</Typography>
-                  <ul>{result.study_plan.map((t, i) => <li key={i}>{t}</li>)}</ul>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="subtitle1">İpuçları</Typography>
-                  <ul>{result.tips.map((t, i) => <li key={i}>{t}</li>)}</ul>
-                </Paper>
-              </Grid>
-            </Grid>
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, width: '100%' }}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle1">Öncelikli Konular</Typography>
+                <ul>{result.topics_to_focus.map((t, i) => <li key={i}>{t}</li>)}</ul>
+              </Paper>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle1">Çalışma Planı</Typography>
+                <ul>{result.study_plan.map((t, i) => <li key={i}>{t}</li>)}</ul>
+              </Paper>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle1">İpuçları</Typography>
+                <ul>{result.tips.map((t, i) => <li key={i}>{t}</li>)}</ul>
+              </Paper>
+            </Box>
           )}
         </Stack>
       </Paper>

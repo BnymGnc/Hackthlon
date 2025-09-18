@@ -33,7 +33,7 @@ function Layout() {
     { to: '/quiz', label: 'Quiz Oluştur' },
     { to: '/summary', label: 'Belge Özeti' },
     { to: '/support', label: 'Psikolojik Destek' },
-    { to: '/analysis', label: 'Sınav Analizi' },
+    { to: '/analysis', label: 'Deneme Analizi' },
     { to: '/career', label: 'Kariyer Hedefleri' },
   ]
   const [menuEl, setMenuEl] = useState<null | HTMLElement>(null)
@@ -74,6 +74,7 @@ function Layout() {
           <Menu anchorEl={anchorEl} id="account-menu" open={open} onClose={handleClose} transformOrigin={{ horizontal: 'right', vertical: 'top' }} anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}>
             <MenuItem onClick={() => { setDrawerOpen(true); handleClose() }}>Geçmiş</MenuItem>
             <MenuItem component={Link} to="/saved-schedule">Ders Programı</MenuItem>
+            <MenuItem component={Link} to="/daily-report">Günlük Rapor</MenuItem>
             <MenuItem component={Link} to="/profile">Profil</MenuItem>
             <MenuItem component={Link} to="/settings">Ayarlar</MenuItem>
             <MenuItem onClick={() => { localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token'); setDrawerOpen(false); handleClose(); navigate('/login') }}>Çıkış Yap</MenuItem>

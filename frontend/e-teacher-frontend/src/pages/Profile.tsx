@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Typography, Paper, Box, TextField, Button, Stack, List, ListItem, ListItemText, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material'
+import { Typography, Paper, Box, TextField, Button, Stack, List, ListItem, ListItemText, Table, TableHead, TableRow, TableCell, TableBody, Chip } from '@mui/material'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
 
@@ -27,6 +27,16 @@ function Profile() {
       } catch {}
     }
     load()
+  }, [])
+  const [dailyReports, setDailyReports] = useState<any[]>([])
+  useEffect(() => {
+    async function loadReports() {
+      try {
+        const { data } = await api.get('/api/ai/daily-report/list/')
+        setDailyReports(Array.isArray(data) ? data : (data.reports || []))
+      } catch {}
+    }
+    loadReports()
   }, [])
   async function handleSave() {
     if (!profile) return
@@ -68,6 +78,27 @@ function Profile() {
                 </ListItem>
               ))}
             </List>
+          )}
+        </Paper>
+      </Stack>
+      <Stack sx={{ mt: 2 }}>
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>Günlük Raporlar</Typography>
+          {dailyReports.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">Henüz günlük rapor yok</Typography>
+          ) : (
+            <Stack spacing={1.5}>
+              {dailyReports.map((r) => (
+                <Box key={r.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                  <Chip size="small" label={new Date(r.date || r.created_at).toLocaleDateString('tr-TR')} />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>Saat: {typeof r.totalHours === 'number' ? r.totalHours.toFixed(1) : (r.total_hours || '-')}h</Typography>
+                  <Typography variant="body2">Verimlilik: {r.productivityScore ?? r.productivity ?? '-'}/10</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.notes || r.aiAnalysis || ''}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
           )}
         </Paper>
       </Stack>

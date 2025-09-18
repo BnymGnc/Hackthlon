@@ -5,10 +5,19 @@ import api from '../lib/api'
 function DocumentSummary() {
   const [text, setText] = useState('')
   const [summary, setSummary] = useState('')
+  const [file, setFile] = useState<File | null>(null)
 
   async function handleSummarize() {
     try {
-      const { data } = await api.post('/api/ai/summarize/', { text })
+      let resp
+      if (file) {
+        const form = new FormData()
+        form.append('file', file)
+        resp = await api.post('/api/ai/summarize/pdf/', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      } else {
+        resp = await api.post('/api/ai/summarize/', { text })
+      }
+      const data = resp.data
       setSummary(data.summary || '')
     } catch (e) {
       setSummary('Özetlenemedi, lütfen tekrar deneyin.')
@@ -21,7 +30,7 @@ function DocumentSummary() {
       <Paper sx={{ p: 3 }}>
         <Stack spacing={2}>
           <Typography variant="body1">Ders notlarını / metni yapıştır; kısa ve anlaşılır özet üretelim.</Typography>
-          <Button variant="outlined" component="label">PDF Yükle<input hidden type="file" accept="application/pdf" /></Button>
+          <Button variant="outlined" component="label">PDF Yükle<input hidden type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} /></Button>
           <TextField label="Metin" multiline minRows={6} fullWidth value={text} onChange={(e) => setText(e.target.value)} />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField label="Özet Uzunluğu" select SelectProps={{ native: true }} defaultValue="orta">
