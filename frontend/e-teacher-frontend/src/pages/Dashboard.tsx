@@ -13,12 +13,12 @@ import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
 function Dashboard() {
   useEffect(() => { /* no-op: removed heavy dashboard calls */ }, [])
   const tiles = [
-    { title: 'Kişisel Çalışma Raporları', desc: 'Güçlü ve zayıf yönler', to: '/reports', icon: <TimelineOutlinedIcon color="primary" /> },
     { title: 'Ders Programı Önerisi', desc: 'Verimli haftalık plan', to: '/schedule', icon: <ScheduleOutlinedIcon color="primary" /> },
     { title: 'Quiz Oluşturma', desc: 'Konu başlığından quiz üret', to: '/quiz', icon: <QuizOutlinedIcon color="primary" /> },
     { title: 'Belge Özeti', desc: 'Notlardan kısa özet', to: '/summary', icon: <ArticleOutlinedIcon color="primary" /> },
     { title: 'Psikolojik Destek', desc: 'Motivasyon ve destek', to: '/support', icon: <PsychologyOutlinedIcon color="primary" /> },
-    { title: 'Kariyer Önerileri', desc: 'İlgi ve sonuçlara göre', to: '/career', icon: <SchoolOutlinedIcon color="primary" /> },
+    { title: 'Hedef Netler', desc: 'Üniversite/Bölüm → TYT/AYT hedef net', to: '/career', icon: <SchoolOutlinedIcon color="primary" /> },
+    { title: 'Sınav Analizi', desc: 'TYT/AYT sonuç analizi ve öneriler', to: '/analysis', icon: <AssessmentOutlinedIcon color="primary" /> },
   ]
 
   return (
@@ -30,10 +30,10 @@ function Dashboard() {
       <Grid container spacing={2} sx={{ mb: 2 }} />
       <Grid container spacing={3} alignItems="stretch">
         {tiles.map((t) => (
-          <Grid item xs={12} sm={6} md={4} key={t.title}>
+          <Grid item xs={12} sm={6} md={6} key={t.title}>
             <Card sx={{ borderRadius: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
               <CardActionArea component={Link} to={t.to} sx={{ p: 2, height: '100%', display: 'flex', alignItems: 'stretch' }}>
-                <CardContent sx={{ display: 'grid', gap: 1, minHeight: 160, width: '100%', alignContent: 'start' }}>
+                <CardContent sx={{ display: 'grid', gap: 1, minHeight: 180, width: '100%', alignContent: 'start' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {t.icon}
                     <Typography variant="h6">{t.title}</Typography>

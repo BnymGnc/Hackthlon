@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Box, Button, Container, TextField, Typography, Alert, Paper } from '@mui/material'
 import api from '../lib/api'
@@ -20,16 +20,48 @@ function Login() {
         username: email,
         password,
       })
-      const { access, refresh } = res.data
-      localStorage.setItem('access_token', access)
-      localStorage.setItem('refresh_token', refresh)
-      navigate('/dashboard')
-    } catch (err) {
-      setError('Giriş başarısız')
+      const { access, refresh } = res.data || {}
+      if (access && refresh) {
+        localStorage.setItem('access_token', access)
+        localStorage.setItem('refresh_token', refresh)
+        console.log('Token alındı ve localStorage\'a kaydedildi:', { access, refresh })
+        // Warm-up: ensure profile exists (server creates if missing)
+        try {
+          await api.get('/api/me/profile/')
+        } catch {}
+        navigate('/dashboard')
+        console.log('Dashboard sayfasına yönlendiriliyor')
+      } else {
+        setError('Giriş başarısız')
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.response?.data?.error
+      setError(detail ? String(detail) : 'Giriş başarısız')
+      console.error('Login hatası:', err)
     } finally {
       setLoading(false)
     }
   }
+
+  // If token exists, verify it before redirect to avoid flicker/loops
+  useEffect(() => {
+    let mounted = true
+    async function verifyAndRedirect() {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+      try {
+        await api.get('/api/me/profile/')
+        if (!mounted) return
+        navigate('/dashboard', { replace: true })
+      } catch {
+        // invalid/expired token → clear and stay on login
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+      }
+    }
+    verifyAndRedirect()
+    return () => { mounted = false }
+  }, [navigate])
 
   return (
     <Container maxWidth="sm" sx={{ mt: 8 }}>

@@ -10,8 +10,7 @@ import Layout from './ui/Layout'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
-import CareerRoadmap from './pages/CareerRoadmap'
-import StudyReports from './pages/StudyReports'
+import TargetNets from './pages/TargetNets'
 import StudySchedule from './pages/StudySchedule'
 import QuizGenerator from './pages/QuizGenerator'
 import DocumentSummary from './pages/DocumentSummary'
@@ -19,26 +18,27 @@ import PsychologicalSupport from './pages/PsychologicalSupport'
 import ExamAnalysis from './pages/ExamAnalysis'
 import HistoryEvents from './pages/HistoryEvents'
 import Profile from './pages/Profile'
+import SavedSchedule from './pages/SavedSchedule'
 import Settings from './pages/Settings'
 import Chat from './pages/Chat'
+// DailyStudyReport removed per request
 
 function requireAuth(element: ReactElement) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+  console.log('Token kontrolü:', token)
   return token ? element : <Navigate to="/login" replace />
 }
 
 const router = createBrowserRouter([
-  { path: '/', element: <App /> },
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
   {
     path: '/',
     element: <Layout />,
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { index: true, element: requireAuth(<Dashboard />) },
       { path: 'dashboard', element: requireAuth(<Dashboard />) },
-      { path: 'career', element: requireAuth(<CareerRoadmap />) },
-      { path: 'reports', element: requireAuth(<StudyReports />) },
+      { path: 'career', element: requireAuth(<TargetNets />) },
       { path: 'schedule', element: requireAuth(<StudySchedule />) },
       { path: 'quiz', element: requireAuth(<QuizGenerator />) },
       { path: 'summary', element: requireAuth(<DocumentSummary />) },
@@ -47,8 +47,10 @@ const router = createBrowserRouter([
       // history/chats removed; use Chat page instead
       { path: 'history/events', element: requireAuth(<HistoryEvents />) },
       { path: 'profile', element: requireAuth(<Profile />) },
+      { path: 'saved-schedule', element: requireAuth(<SavedSchedule />) },
       { path: 'settings', element: requireAuth(<Settings />) },
       { path: 'chat', element: requireAuth(<Chat />) },
+      // daily-report route removed per request
     ],
   },
 ])

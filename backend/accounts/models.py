@@ -9,7 +9,7 @@ class UserProfile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
-        return self.full_name or self.user.username
+        return self.full_name or self.user.username  # type: ignore[return-value]
 
 # Create your models here.
 
@@ -23,4 +23,4 @@ class CareerRoadmap(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
-        return f"CareerRoadmap({self.user.username}, {self.created_at:%Y-%m-%d})"
+        return f"CareerRoadmap({self.user.username}, {self.created_at:%Y-%m-%d})"  # type: ignore[attr-defined]

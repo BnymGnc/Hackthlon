@@ -29,13 +29,12 @@ function Layout() {
   }, [drawerOpen])
   const links = [
     { to: '/dashboard', label: 'Panel' },
-    { to: '/career', label: 'Kariyer' },
-    { to: '/reports', label: 'Raporlar' },
-    { to: '/schedule', label: 'Ders Programı' },
-    { to: '/quiz', label: 'Quiz' },
-    { to: '/summary', label: 'Özet' },
-    { to: '/support', label: 'Destek' },
-    { to: '/analysis', label: 'Analiz' },
+    { to: '/schedule', label: 'Ders Programı Öner' },
+    { to: '/quiz', label: 'Quiz Oluştur' },
+    { to: '/summary', label: 'Belge Özeti' },
+    { to: '/support', label: 'Psikolojik Destek' },
+    { to: '/analysis', label: 'Sınav Analizi' },
+    { to: '/career', label: 'Kariyer Hedefleri' },
   ]
   const [menuEl, setMenuEl] = useState<null | HTMLElement>(null)
   const menuOpen = Boolean(menuEl)
@@ -74,6 +73,7 @@ function Layout() {
           </Tooltip>
           <Menu anchorEl={anchorEl} id="account-menu" open={open} onClose={handleClose} transformOrigin={{ horizontal: 'right', vertical: 'top' }} anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}>
             <MenuItem onClick={() => { setDrawerOpen(true); handleClose() }}>Geçmiş</MenuItem>
+            <MenuItem component={Link} to="/saved-schedule">Ders Programı</MenuItem>
             <MenuItem component={Link} to="/profile">Profil</MenuItem>
             <MenuItem component={Link} to="/settings">Ayarlar</MenuItem>
             <MenuItem onClick={() => { localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token'); setDrawerOpen(false); handleClose(); navigate('/login') }}>Çıkış Yap</MenuItem>
@@ -81,7 +81,7 @@ function Layout() {
         </Toolbar>
       </AppBar>
       <Toolbar />
-      <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Container maxWidth="xl" sx={{ py: 3 }}>
         <Outlet />
       </Container>
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
@@ -90,15 +90,16 @@ function Layout() {
           <List>
             {recent.map((a) => {
               const t = String(a.title || '')
-              let type: 'quiz'|'chat'|'support'|'report'|'schedule'|'other' = 'other'
+              let type: 'quiz'|'chat'|'support'|'report'|'schedule'|'daily'|'other' = 'other'
               let to = '/dashboard'
               if (/quiz/i.test(t)) { type = 'quiz'; to = '/quiz' }
               else if (/chat/i.test(t)) { type = 'chat'; to = '/chat' }
               else if (/psychsupport|support/i.test(t)) { type = 'support'; to = '/support' }
               else if (/report|rapor/i.test(t)) { type = 'report'; to = '/reports' }
               else if (/schedule|program/i.test(t)) { type = 'schedule'; to = '/schedule' }
-              const color = type === 'quiz' ? 'primary' : type === 'chat' ? 'secondary' : type === 'support' ? 'success' : type === 'report' ? 'warning' : type === 'schedule' ? 'info' : 'default'
-              const label = type === 'quiz' ? 'Quiz' : type === 'chat' ? 'Sohbet' : type === 'support' ? 'Destek' : type === 'report' ? 'Rapor' : type === 'schedule' ? 'Program' : 'Diğer'
+              else if (/daily|günlük/i.test(t)) { type = 'daily'; to = '/daily-report' }
+              const color = type === 'quiz' ? 'primary' : type === 'chat' ? 'secondary' : type === 'support' ? 'success' : type === 'report' ? 'warning' : type === 'schedule' ? 'info' : type === 'daily' ? 'error' : 'default'
+              const label = type === 'quiz' ? 'Quiz' : type === 'chat' ? 'Sohbet' : type === 'support' ? 'Destek' : type === 'report' ? 'Rapor' : type === 'schedule' ? 'Program' : type === 'daily' ? 'Günlük' : 'Diğer'
               return (
                 <ListItem key={a.id} disablePadding>
                   <ListItemButton onClick={() => { setDrawerOpen(false); navigate(to) }}>
@@ -118,5 +119,3 @@ function Layout() {
 }
 
 export default Layout
-
-

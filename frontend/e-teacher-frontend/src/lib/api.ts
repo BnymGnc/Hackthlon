@@ -13,11 +13,24 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+let isRedirectingToLogin = false
 api.interceptors.response.use(
   (resp) => resp,
   async (error) => {
-    const original = error.config
-    if (error?.response?.status === 401 && !original._retry) {
+    const original: any = error.config
+    const status = error?.response?.status
+
+    // If schedule save gets forbidden (e.g., bad token), retry without auth (public endpoint)
+    if (!original?._retried_noauth && status === 403 && typeof original?.url === 'string' && original.url.includes('/api/ai/schedule/save/')) {
+      try {
+        original._retried_noauth = true
+        original.headers = { ...(original.headers || {}) }
+        delete original.headers['Authorization']
+        return axios(original)
+      } catch {}
+    }
+
+    if (status === 401 && !original._retry) {
       original._retry = true
       try {
         const refresh = localStorage.getItem('refresh_token')
@@ -32,10 +45,13 @@ api.interceptors.response.use(
           }
         }
       } catch {}
-      // if refresh fails, drop tokens and redirect to login
+      // if refresh fails, drop tokens and navigate to login once to avoid loops
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
-      try { window.location.href = '/login' } catch {}
+      if (!isRedirectingToLogin && typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        isRedirectingToLogin = true
+        try { window.location.assign('/login') } catch {}
+      }
     }
     return Promise.reject(error)
   }

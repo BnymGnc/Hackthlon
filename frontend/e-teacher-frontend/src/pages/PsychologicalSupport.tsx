@@ -10,10 +10,15 @@ function PsychologicalSupport() {
   const [history, setHistory] = useState<{ role: 'user'|'assistant', content: string }[]>([])
 
   async function handleSupport() {
-    const { data } = await api.post('/api/ai/psych-support/', { mood, message, history })
-    const reply = data.support || ''
-    setSupport(reply)
-    setHistory((h) => [...h, { role: 'user', content: message || mood }, { role: 'assistant', content: reply }])
+    try {
+      const { data } = await api.post('/api/ai/psych-support/', { mood, message, history })
+      const reply = data.support || ''
+      setSupport(reply)
+      setHistory((h) => [...h, { role: 'user', content: message || mood }, { role: 'assistant', content: reply }])
+    } catch (error) {
+      console.error('Error getting psychological support:', error)
+      setSupport('Üzgünüz, şu anda destek alınamıyor. Lütfen daha sonra tekrar deneyin.')
+    }
   }
   return (
     <Box>
@@ -59,5 +64,3 @@ function PsychologicalSupport() {
 }
 
 export default PsychologicalSupport
-
-

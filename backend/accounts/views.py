@@ -1,13 +1,16 @@
-from rest_framework import permissions, status, generics
+from rest_framework import permissions, status, generics, views
 from rest_framework.response import Response
-from django.contrib.auth.models import User
-from .models import UserProfile, CareerRoadmap
 from rest_framework.serializers import ModelSerializer, CharField, EmailField, ListField, ValidationError
-from rest_framework import views
-import os
-import requests
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
+from django.contrib.auth.models import User
+from .models import UserProfile, CareerRoadmap
+import os
+import requests
+from typing import TYPE_CHECKING, Any, Dict
+
+if TYPE_CHECKING:
+    from django.db import models
 
 
 class RegisterSerializer(ModelSerializer):
@@ -24,7 +27,7 @@ class RegisterSerializer(ModelSerializer):
             email=validated_data["email"],
             password=validated_data["password"],
         )
-        UserProfile.objects.create(user=user)
+        UserProfile.objects.create(user=user)  # type: ignore[attr-defined]
         return user
 
     def validate(self, attrs):
@@ -56,7 +59,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
-        profile, _ = UserProfile.objects.get_or_create(user=self.request.user)
+        profile, _ = UserProfile.objects.get_or_create(user=self.request.user)  # type: ignore[attr-defined]
         return profile
 
 # Create your views here.
@@ -102,7 +105,7 @@ class SaveCareerRoadmapView(views.APIView):
                 "Psikoloji",
             ]
 
-        roadmap = CareerRoadmap.objects.create(
+        roadmap = CareerRoadmap.objects.create(  # type: ignore[attr-defined]
             user=request.user,
             interests=interests,
             strengths=strengths,
@@ -118,7 +121,7 @@ class CareerRoadmapListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return CareerRoadmap.objects.filter(user=self.request.user).order_by('-created_at')
+        return CareerRoadmap.objects.filter(user=self.request.user).order_by('-created_at')  # type: ignore[attr-defined]
 
 
 class EmailOrUsernameTokenSerializer(TokenObtainPairSerializer):
@@ -132,7 +135,7 @@ class EmailOrUsernameTokenSerializer(TokenObtainPairSerializer):
             try:
                 user = User.objects.get(email__iexact=username)
                 attrs['username'] = getattr(user, self.username_field)
-            except User.DoesNotExist:
+            except User.DoesNotExist:  # type: ignore[attr-defined]
                 pass
         return super().validate(attrs)
 
