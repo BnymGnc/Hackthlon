@@ -5,18 +5,12 @@ import api from '../lib/api'
 function DocumentSummary() {
   const [text, setText] = useState('')
   const [summary, setSummary] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  // PDF upload removed
 
   async function handleSummarize() {
     try {
-      let resp
-      if (file) {
-        const form = new FormData()
-        form.append('file', file)
-        resp = await api.post('/api/ai/summarize/pdf/', form, { headers: { 'Content-Type': 'multipart/form-data' } })
-      } else {
-        resp = await api.post('/api/ai/summarize/', { text })
-      }
+      const limited = (text || '').slice(0, 4000)
+      const resp = await api.post('/api/ai/summarize/', { text: limited })
       const data = resp.data
       setSummary(data.summary || '')
     } catch (e) {
@@ -29,9 +23,8 @@ function DocumentSummary() {
       <Typography variant="h5" gutterBottom>Belge Özeti</Typography>
       <Paper sx={{ p: 3 }}>
         <Stack spacing={2}>
-          <Typography variant="body1">Ders notlarını / metni yapıştır; kısa ve anlaşılır özet üretelim.</Typography>
-          <Button variant="outlined" component="label">PDF Yükle<input hidden type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} /></Button>
-          <TextField label="Metin" multiline minRows={6} fullWidth value={text} onChange={(e) => setText(e.target.value)} />
+          <Typography variant="body1">Ders notlarını / metni yapıştır; kısa ve anlaşılır özet üretelim. (Maks 4000 karakter)</Typography>
+          <TextField label="Metin" multiline minRows={6} fullWidth value={text} onChange={(e) => setText(e.target.value.slice(0, 4000))} helperText={`${text.length}/4000`} />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField label="Özet Uzunluğu" select SelectProps={{ native: true }} defaultValue="orta">
               <option value="kısa">Kısa</option>

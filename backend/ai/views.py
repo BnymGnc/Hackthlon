@@ -30,18 +30,26 @@ def randomize_quiz_options(question_data: Dict[str, Any]) -> Dict[str, Any]:
     return question_data
 
 def _get_ai_api_key() -> str | None:
-    key = os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY')
+    # Some editors add a UTF-8 BOM (\ufeff) at the start of files/env values.
+    # Requests encodes HTTP headers as latin-1; a BOM in the key breaks header encoding.
+    def _sanitize(value: str | None) -> str | None:
+        if value is None:
+            return None
+        # Strip BOM and whitespace/newlines
+        return value.lstrip('\ufeff').strip()
+
+    key = _sanitize(os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY'))
     if key:
         return key
     try:
         ai_dir = Path(__file__).resolve().parent
         ai_key_path = ai_dir / 'openrouter.key'
         if ai_key_path.exists():
-            return ai_key_path.read_text(encoding='utf-8').strip()
+            return _sanitize(ai_key_path.read_text(encoding='utf-8'))
         backend_dir = ai_dir.parent
         backend_key_path = backend_dir / 'openrouter.key'
         if backend_key_path.exists():
-            return backend_key_path.read_text(encoding='utf-8').strip()
+            return _sanitize(backend_key_path.read_text(encoding='utf-8'))
     except Exception:
         pass
     return None
@@ -172,7 +180,13 @@ class AISummarizeView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        text = request.data.get('text') or ''
+        raw_text = (request.data.get('text') or '').strip()
+        # Enforce a reasonable max length to avoid echoing long text and control cost
+        if len(raw_text) > 4000:
+            raw_text = raw_text[:4000]
+        # Minimal de-duplication/whitespace normalization
+        import re as _re
+        text = _re.sub(r"\s+", " ", raw_text)
         api_key = _get_ai_api_key()
         if api_key and text:
             try:
@@ -183,21 +197,71 @@ class AISummarizeView(views.APIView):
                     'HTTP-Referer': os.getenv('OPENROUTER_SITE_URL', 'http://localhost:5173'),
                     'X-Title': os.getenv('OPENROUTER_TITLE', 'E-Teacher'),
                 }
-                prompt = f"Şu metni kısa ve maddeler halinde özetle (TR):\n\n{text}"
+                prompt = (
+                    "Aşağıdaki metni gerçekten ÖZETLE ve YENİDEN İFADE ET.\n"
+                    "- Türkçe, maddeler halinde, 5-8 madde.\n"
+                    "- En önemli kavramları koru, tekrarları at.\n"
+                    "- Örnek/uzun alıntıları kısalt.\n"
+                    "- Sadece ÖZET döndür, metni tekrar etme.\n\n"
+                    f"METİN:\n{text}"
+                )
                 payload = {
                     'model': os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-chat'),
-                    'messages': [ { 'role': 'user', 'content': prompt + '\nSadece düz metin döndür.' } ],
+                    'messages': [ { 'role': 'system', 'content': 'Kısa, maddeli, özgün Türkçe ÖZET üret. Metni kopyalama.' }, { 'role': 'user', 'content': prompt } ],
                     'temperature': 0.2,
-                    'max_tokens': 800,
+                    'max_tokens': int(os.getenv('SUMMARIZE_MAX_TOKENS', '400')),
                 }
                 resp = requests.post(provider_url, json=payload, headers=headers, timeout=20)
+                if resp.status_code == 402:
+                    payload['max_tokens'] = max(150, int(payload['max_tokens']) // 2)
+                    resp = requests.post(provider_url, json=payload, headers=headers, timeout=15)
                 if resp.ok:
                     content = resp.json().get('choices', [{}])[0].get('message', {}).get('content') or ''
+                    # Basic check: if model echoed the input, fall back to extractive summary
+                    echoed = content.replace('\n',' ').strip().lower() == text.lower()
+                    if echoed or len(content.strip()) < 10:
+                        content = self._local_extractive_summary(text)
                     return Response({ 'summary': content or text[:200] })
                 return Response({ 'summary': f'mock: {text[:200]}' })
             except Exception as e:
-                return Response({ 'summary': f'mock: {text[:200]}', 'error': str(e) }, status=status.HTTP_200_OK)
-        return Response({ 'summary': f'mock: {text[:200]}' })
+                # Fall back to local summarizer but keep 200 OK for UX
+                return Response({ 'summary': self._local_extractive_summary(text) or text[:200], 'note': 'local_fallback' }, status=status.HTTP_200_OK)
+        # No API key: use local summarizer (extractive + bullets)
+        return Response({ 'summary': self._local_extractive_summary(text) or text[:200] })
+
+    def _local_extractive_summary(self, text: str) -> str:
+        try:
+            raw = (text or '').strip()
+            if not raw:
+                return ''
+            # Split into sentences (very lightweight Turkish-friendly splitter)
+            import re
+            sentences = [s.strip() for s in re.split(r"(?<=[\.!?])\s+|\n+", raw) if s and len(s.strip()) > 0]
+            if not sentences:
+                return raw[:200]
+            # Build term frequency excluding very short/common tokens
+            tokens = re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşü0-9']+", raw.lower())
+            stop = set(['ve','ile','da','de','ki','bu','şu','o','bir','çok','az','için','gibi','olan','olarak','the','a','an','to','of','in','on','at','is','are','was','were'])
+            freq = {}
+            for t in tokens:
+                if len(t) < 3 or t in stop:
+                    continue
+                freq[t] = freq.get(t, 0) + 1
+            # Score sentences by token frequency
+            def score_sentence(s: str) -> float:
+                words = re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşü0-9']+", s.lower())
+                if not words:
+                    return 0.0
+                return sum(freq.get(w, 0) for w in words) / (len(words) + 1e-6)
+            scored = [(score_sentence(s), idx, s) for idx, s in enumerate(sentences)]
+            scored.sort(key=lambda x: (-x[0], x[1]))
+            # Select top 3-6 sentences depending on length
+            target = 5 if len(sentences) > 8 else min(3, len(sentences))
+            top = sorted(scored[:target], key=lambda x: x[1])
+            bullets = [f"- {s.strip()}" for _, _, s in top]
+            return "\n".join(bullets)
+        except Exception:
+            return text[:200]
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -756,11 +820,11 @@ class AIQuizGenerateView(views.APIView):
                             'model': os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-chat'),
                             'messages': [ { 'role': 'user', 'content': topic_specific_prompt } ],
                             'response_format': { 'type': 'json_object' },
-                            'temperature': 0.9,
-                            'max_tokens': 1200,
-                            'top_p': 0.95,
-                            'frequency_penalty': 0.3,
-                            'presence_penalty': 0.2,
+                            'temperature': 0.5,
+                            'max_tokens': int(os.getenv('QUIZ_MAX_TOKENS', '400')),
+                            'top_p': 0.9,
+                            'frequency_penalty': 0.1,
+                            'presence_penalty': 0.1,
                         }
                         
                         print(f"Attempt {attempt + 1}: Sending request to {provider_url}")
@@ -770,6 +834,12 @@ class AIQuizGenerateView(views.APIView):
                         # Multiple timeout attempts
                         timeout = 15 if attempt == 0 else 20  # Longer timeout on retries
                         resp = requests.post(provider_url, json=payload, headers=headers, timeout=timeout)
+
+                        # Handle credit error by retrying with fewer tokens immediately
+                        if resp.status_code == 402:
+                            payload_retry = payload.copy()
+                            payload_retry['max_tokens'] = max(150, int(payload.get('max_tokens', 400)) // 2)
+                            resp = requests.post(provider_url, json=payload_retry, headers=headers, timeout=timeout)
                         
                         print(f"Attempt {attempt + 1}: Response status {resp.status_code}")
                         
@@ -789,30 +859,9 @@ class AIQuizGenerateView(views.APIView):
                             import time
                             time.sleep(1)  # Brief pause before retry
 
-            # SECONDARY: If AI failed completely, try different model or approach
+            # Do NOT use local/predefined questions. If AI fails, return error.
             if not questions or len(questions) < num_questions:
-                print(f"Primary AI failed. Trying secondary approach...")
-                questions = self._try_secondary_ai_generation(topics, difficulty, num_questions, api_key)
-
-            # TERTIARY: Last resort - generate emergency questions using AI with simpler prompt
-            if not questions or len(questions) < num_questions:
-                print(f"Secondary AI failed. Using emergency AI generation...")
-                questions = self._emergency_ai_generation(topics, difficulty, num_questions, api_key)
-
-            # NO FALLBACK: 100% AI-dependent as requested
-            if not questions:
-                print(f"All AI attempts failed. NO FALLBACK QUESTIONS as per user request.")
-                # Check if the issue is missing API key
-                if not api_key or api_key.startswith('sk-or-v1-your-api-key'):
-                    return Response({
-                        'error': f'AI API anahtarı yapılandırılmamış. Lütfen OpenRouter API anahtarınızı backend/openrouter.key dosyasına ekleyin.',
-                        'questions': []
-                    }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-                
-                return Response({
-                    'error': f'{topics} konusunda quiz oluşturulamadı. AI servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.',
-                    'questions': []
-                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                return Response({ 'error': 'AI üzerinden quiz oluşturulamadı.', 'questions': [] }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
             # Only save to database if questions were successfully generated
             if questions and hasattr(request, 'user') and request.user.is_authenticated:
@@ -837,6 +886,177 @@ class AIQuizGenerateView(views.APIView):
                 'error': f'{topics} konusunda quiz oluşturma sırasında hata oluştu: {str(e)}',
                 'questions': []
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _local_quiz_generation(self, topics: str, difficulty: str, count: int):
+        try:
+            import re
+            rng = random.Random()
+            topic_text = (topics or 'Genel').strip()
+            level = (difficulty or 'orta').lower()
+            level = 'kolay' if level.startswith('ko') else 'zor' if level.startswith('z') else 'orta'
+
+            def pick(n, arr):
+                arr_copy = arr[:]
+                rng.shuffle(arr_copy)
+                return arr_copy[:n]
+
+            # Detect subject from topic keywords
+            t = topic_text.lower()
+            subject = 'genel'
+            if any(k in t for k in ['mat', 'türev', 'integral', 'geometri', 'trig']):
+                subject = 'matematik'
+            elif any(k in t for k in ['fizik', 'kuvvet', 'enerji', 'elektrik', 'optik', 'hareket']):
+                subject = 'fizik'
+            elif any(k in t for k in ['kimya', 'asit', 'baz', 'reaksiyon', 'mol', 'molekül']):
+                subject = 'kimya'
+            elif any(k in t for k in ['biyoloji', 'hücre', 'genetik', 'ekoloji', 'mitoz', 'mev']):
+                subject = 'biyoloji'
+            elif any(k in t for k in ['türkçe', 'paragraf', 'anlam', 'edebiyat', 'fiil', 'ek']):
+                subject = 'turkce'
+            elif any(k in t for k in ['tarih', 'inkılap', 'osmanlı', 'cumhuriyet']):
+                subject = 'tarih'
+            elif any(k in t for k in ['coğrafya', 'cografya', 'iklim', 'yeryüzü', 'nüfus']):
+                subject = 'cografya'
+
+            # Item banks per subject (short, curriculum-like)
+            banks = {
+                'matematik': [
+                    {
+                        'q': 'f(x)=3x^2+2x-5 için f\'(x) nedir?',
+                        'a': ['6x+2', '3x+2', '6x-5', '3x^2+2'],
+                        'ex': 'Türev: (ax^2)\' = 2ax, (bx)\' = b, sabitin türevi 0. 6x+2.'
+                    },
+                    {
+                        'q': 'sin(30°) değeri aşağıdakilerden hangisidir?',
+                        'a': ['1/2', '√3/2', '√2/2', '1'],
+                        'ex': 'Özel açılar: sin30° = 1/2.'
+                    },
+                    {
+                        'q': 'A(2,3) ve B(6,3) noktaları arasındaki uzaklık kaç birimdir?',
+                        'a': ['4', '3', '5', '√10'],
+                        'ex': 'Aynı yatay doğruda: |6-2|=4.'
+                    },
+                ],
+                'fizik': [
+                    {
+                        'q': 'F=ma bağıntısında birim sistemi (SI) için F birimi nedir?',
+                        'a': ['Newton', 'Joule', 'Watt', 'Pascal'],
+                        'ex': 'F kuvvet, SI birimi Newton (N).'
+                    },
+                    {
+                        'q': 'Sürtünmesiz yatay düzlemde 5 N net kuvvet alan 1 kg cisim kaç m/s² ivmelenir?',
+                        'a': ['5', '0.2', '1', '10'],
+                        'ex': 'a=F/m=5/1=5 m/s².'
+                    },
+                ],
+                'kimya': [
+                    {
+                        'q': 'pH=2 olan çözeltinin asitlik durumu için doğru ifade?',
+                        'a': ['Güçlü asidiktir', 'Nötrdür', 'Zayıf baziktir', 'Güçlü baziktir'],
+                        'ex': 'pH<7 asidik; 2 çok güçlü asidik.'
+                    },
+                    {
+                        'q': '2H₂ + O₂ → 2H₂O denkleminde 2 mol O₂ ile tam tepkimede kaç mol H₂O oluşur?',
+                        'a': ['4', '2', '1', '3'],
+                        'ex': 'Oran 1 O₂ → 2 H₂O, 2 O₂ → 4 H₂O.'
+                    },
+                ],
+                'biyoloji': [
+                    {
+                        'q': 'Fotosentez hangi organelde gerçekleşir?',
+                        'a': ['Kloroplast', 'Mitokondri', 'Ribozom', 'Lizozom'],
+                        'ex': 'Kloroplast klorofil taşır; ışık reaksiyonları burada.'
+                    },
+                    {
+                        'q': "DNA'dan mRNA sentezi süreci nedir?",
+                        'a': ['Transkripsiyon', 'Translasyon', 'Replikasyon', 'Fagositoz'],
+                        'ex': 'DNA→mRNA: transkripsiyon; mRNA→protein: translasyon.'
+                    },
+                ],
+                'turkce': [
+                    {
+                        'q': 'Aşağıdaki cümlelerden hangisinde özne-yüklem uyumu vardır?',
+                        'a': ['Öğrenciler sabah erkenden okula geldiler.', 'Öğrenciler sabah erkenden okula geldi.', 'Öğrenci sabah erkenden okula geldiler.', 'Öğrenci sabah erkenden okula gelirsiniz.'],
+                        'ex': 'Çoğul özne "öğrenciler" → yüklem çoğul "geldiler".'
+                    },
+                    {
+                        'q': '"-de/-da" ekinin yazımı için doğru kullanım hangisidir?',
+                        'a': ['Evde kimse yoktu.', 'Evd e kimse yoktu.', 'Ev dekim se yoktu.', 'Ev de kimse yok tu.'],
+                        'ex': 'Ayrılma değil bulunma eki bitişik yazılır: evde.'
+                    },
+                ],
+                'tarih': [
+                    {
+                        'q': 'Türkiye Cumhuriyeti hangi yılda ilan edildi?',
+                        'a': ['1923', '1919', '1920', '1921'],
+                        'ex': 'Cumhuriyet 29 Ekim 1923.'
+                    },
+                ],
+                'cografya': [
+                    {
+                        'q': 'Ekvator çevresinde yıl boyunca görülen iklim tipi hangisidir?',
+                        'a': ['Ekvatoral iklim', 'Çöl iklimi', 'Tundra iklimi', 'Muson iklimi'],
+                        'ex': 'Ekvator çevresinde yıl boyu sıcak ve yağışlı: ekvatoral.'
+                    },
+                ],
+                'genel': [
+                    {
+                        'q': 'Bilimsel yöntemin ilk basamağı aşağıdakilerden hangisidir?',
+                        'a': ['Problemi fark etmek', 'Deney yapmak', 'Sonuçları yayınlamak', 'Hipotezi doğrulamak'],
+                        'ex': 'Önce problem belirlenir; sonra hipotez ve deney.'
+                    }
+                ]
+            }
+
+            # Difficulty tuning: for kolay, prefer recall; zor, add calculation/why
+            def tune(q):
+                if level == 'kolay':
+                    return q
+                if level == 'orta':
+                    q['explanation'] = q.get('ex') or q.get('explanation', '')
+                    q.pop('ex', None)
+                    return q
+                # zor: add small twist to stem when possible
+                stem = q['q']
+                if subject == 'matematik' and 'f(' in stem and "'" in stem:
+                    stem = stem + ' ve x=1 için değeri kaçtır?'
+                    correct = q['a'][0]
+                    # attempt compute simple cases if matches known
+                    if '6x+2' in correct:
+                        tuned_opts = ['8', '6', '4', '2']
+                        q['a'] = tuned_opts
+                        q['correct'] = '8'
+                        q['explanation'] = 'f\'(x)=6x+2, x=1 → 8.'
+                q['q'] = stem
+                q['explanation'] = q.get('explanation') or q.get('ex') or ''
+                q.pop('ex', None)
+                return q
+
+            base = banks.get(subject, banks['genel'])
+            # If specific keywords inside the subject exist, try to filter
+            narrowed = [b for b in base if any(kw in b['q'].lower() or kw in topic_text.lower() for kw in re.findall(r"[a-zçğıöşü]+", t))] or base
+
+            questions = []
+            needed = max(0, int(count))
+            idx = 0
+            while len(questions) < needed:
+                item = dict(narrowed[idx % len(narrowed)])
+                idx += 1
+                # Construct question dict in expected shape
+                options = item['a'][:]
+                correct = options[0]
+                qdict = {
+                    'q': item['q'],
+                    'a': options,
+                    'correct': correct,
+                    'explanation': item.get('ex', '')
+                }
+                qdict = tune(qdict)
+                questions.append(randomize_quiz_options(qdict))
+
+            return questions
+        except Exception:
+            return []
     
     def _create_topic_specific_prompt(self, topics, difficulty, num_questions, random_seed, current_time):
         """Create enhanced topic-specific prompts for better AI responses"""
@@ -1185,6 +1405,14 @@ class AIPsychSupportView(views.APIView):
                     'max_tokens': 600,
                 }
                 resp = requests.post(provider_url, json=payload, headers=headers, timeout=8)
+                # Handle credit/max_tokens errors by retrying with a lower limit
+                if resp.status_code == 402:
+                    try:
+                        payload_retry = { **payload, 'max_tokens': 300 }
+                    except Exception:
+                        payload_retry = payload
+                        payload_retry['max_tokens'] = 300
+                    resp = requests.post(provider_url, json=payload_retry, headers=headers, timeout=8)
                 if resp.ok:
                     content = resp.json().get('choices', [{}])[0].get('message', {}).get('content') or ''
                     # log assessment
@@ -1194,6 +1422,7 @@ class AIPsychSupportView(views.APIView):
                         pass
                     return Response({ 'support': content })
             except Exception:
+                # fall through to local fallback below
                 pass
         # Fallback
         fallback = (
@@ -1277,6 +1506,16 @@ class AIChatView(views.APIView):
                 
                 print(f"API Response Status: {resp.status_code}")
                 
+                # Retry with lower max_tokens if credit error (402)
+                if resp.status_code == 402:
+                    try:
+                        payload_retry = { **payload, 'max_tokens': 300 }
+                    except Exception:
+                        payload_retry = payload
+                        payload_retry['max_tokens'] = 300
+                    resp = requests.post(provider_url, json=payload_retry, headers=headers, timeout=12)
+                    print(f"Retry Response Status: {resp.status_code}")
+                
                 if resp.ok:
                     response_data = resp.json()
                     content = response_data.get('choices', [{}])[0].get('message', {}).get('content') or ''
@@ -1296,8 +1535,13 @@ class AIChatView(views.APIView):
                     elif resp.status_code == 429:
                         return Response({ 'reply': 'API kullanım limitine ulaşıldı. Lütfen birkaç dakika sonra tekrar deneyin.' })
                     else:
-                        return Response({ 'reply': f'AI servisi geçici olarak kullanılamıyor (Hata {resp.status_code}). Lütfen daha sonra tekrar deneyin.' })
-                        
+                        fallback_reply = (
+                            "Şu an dış servis kısıtlı görünüyor, ama yine de yardımcı olayım.\n"
+                            "- Hedefini küçük adımlara böl\n- 25 dk odak + 5 dk mola (Pomodoro)\n"
+                            "- 4x4 nefes egzersizi dene\n- Bugün tek bir küçük iş seç ve tamamla"
+                        )
+                        return Response({ 'reply': fallback_reply })
+
             except requests.exceptions.Timeout:
                 print("❌ Request timeout")
                 return Response({ 'reply': 'AI yanıt verme süresi aşıldı. Lütfen tekrar deneyin.' })
@@ -1610,14 +1854,70 @@ class AIDailyReportView(views.APIView):
             ).first()
             
             if report:
+                # Ensure sessions are ordered by start time
+                sessions = report.data.get('sessions', []) or []
+                try:
+                    def _key(s):
+                        t = (s.get('startTime') or '00:00')
+                        return int(t.split(':')[0]) * 60 + int(t.split(':')[1])
+                    sessions = sorted(sessions, key=_key)
+                except Exception:
+                    pass
                 return Response({
-                    'sessions': report.data.get('sessions', []),
+                    'date': report.data.get('date', date),
+                    'sessions': sessions,
+                    'productivityScore': report.data.get('productivityScore', None),
+                    'studyHours': report.data.get('studyHours', report.data.get('totalHours', None)),
+                    'totalHours': report.data.get('totalHours', report.data.get('studyHours', None)),
+                    'dailyNotes': report.data.get('dailyNotes', report.data.get('notes', '')),
                     'aiAnalysis': report.data.get('aiAnalysis', '')
                 })
             else:
-                # Return empty report if none exists
+                # No saved report → infer today's schedule sessions for the weekday
+                inferred_sessions = []
+                try:
+                    from datetime import datetime as _dt
+                    weekday = _dt.fromisoformat(date).weekday()  # 0=Mon..6=Sun
+                    labels = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz']
+                    day_label = labels[weekday] if 0 <= weekday <= 6 else 'Pzt'
+                    latest = Assessment.objects.filter(  # type: ignore[attr-defined]
+                        user=request.user,
+                        data__type='schedule'
+                    ).order_by('-created_at').first()
+                    if latest and latest.data:
+                        sched = latest.data.get('schedule')
+                        day_entry = None
+                        if isinstance(sched, dict) and isinstance(sched.get('schedule'), list):
+                            day_entry = next((d for d in sched['schedule'] if d.get('day') == day_label), None)
+                        elif isinstance(sched, list):
+                            day_entry = next((d for d in sched if d.get('day') == day_label), None)
+                        if day_entry:
+                            items = day_entry.get('items', [])
+                            for it in items:
+                                try:
+                                    parts = it.rsplit(' ', 1)
+                                    subject = parts[0].strip()
+                                    times = parts[1]
+                                    start, end = times.split('-')
+                                    inferred_sessions.append({
+                                        'id': uuid.uuid4().hex,
+                                        'subject': subject,
+                                        'startTime': start,
+                                        'endTime': end,
+                                        'productivity': 5,
+                                        'notes': ''
+                                    })
+                                except Exception:
+                                    continue
+                except Exception:
+                    pass
+
                 return Response({
-                    'sessions': [],
+                    'date': date,
+                    'sessions': inferred_sessions,
+                    'productivityScore': None,
+                    'studyHours': None,
+                    'dailyNotes': '',
                     'aiAnalysis': ''
                 })
         except Exception as e:
@@ -1626,10 +1926,14 @@ class AIDailyReportView(views.APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def post(self, request):
-        """Save daily report"""
+        """Save daily report (sessions + optional productivity, hours, notes, and analysis)"""
         try:
             date = request.data.get('date')
             sessions = request.data.get('sessions', [])
+            productivity_score = request.data.get('productivityScore') or request.data.get('productivity')
+            study_hours = request.data.get('studyHours') or request.data.get('totalHours')
+            daily_notes = request.data.get('dailyNotes', '') or request.data.get('notes', '')
+            ai_analysis = request.data.get('aiAnalysis', '')
             
             if not date:
                 return Response({
@@ -1646,6 +1950,11 @@ class AIDailyReportView(views.APIView):
                         'type': 'daily_report',
                         'date': date,
                         'sessions': sessions,
+                        'productivityScore': productivity_score,
+                        'studyHours': study_hours,
+                        'totalHours': study_hours,
+                        'dailyNotes': daily_notes,
+                        'aiAnalysis': ai_analysis,
                         'createdAt': datetime.now().isoformat()
                     }
                 }
@@ -1781,11 +2090,17 @@ class AIDailyReportAnalyzeView(views.APIView):
             payload = {
                 'model': os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-chat'),
                 'messages': [{'role': 'user', 'content': prompt}],
-                'temperature': 0.5,
-                'max_tokens': 1000,
+                'temperature': 0.4,
+                'max_tokens': int(os.getenv('DAILY_REPORT_MAX_TOKENS', '500')),
+                'top_p': 0.9,
             }
             
             resp = requests.post(provider_url, json=payload, headers=headers, timeout=15)
+            
+            if resp.status_code == 402:
+                payload_retry = payload.copy()
+                payload_retry['max_tokens'] = max(150, int(payload.get('max_tokens', 500)) // 2)
+                resp = requests.post(provider_url, json=payload_retry, headers=headers, timeout=12)
             
             if resp.ok:
                 response_data = resp.json()

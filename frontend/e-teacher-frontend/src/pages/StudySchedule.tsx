@@ -988,60 +988,7 @@ function StudySchedule() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Box sx={{ width: 12, height: 12, bgcolor: 'error.light', borderRadius: 0.5 }} /> <Typography variant="caption">Müsait değil</Typography></Box>
             </Stack>
           </Box>
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Ders Ekle</Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ my: 1 }}>
-              {courseList.map(c => (
-                <Stack key={c} direction="row" spacing={1} alignItems="center" sx={{ p: 1, my: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
-                  draggable
-                  onDragStart={() => onDragStartCourse(c)}
-                  onDragEnd={onDragEndCourse}
-                >
-                  <Typography variant="caption" sx={{ minWidth: 80 }}>{c}</Typography>
-                  <TextField size="small" type="number" inputProps={{ min: 0, max: 10 }} sx={{ width: 72 }}
-                    value={selectedSubjects[c] || ''}
-                    onChange={(e) => setSelectedSubjects((prev) => ({ ...prev, [c]: Math.max(0, Math.min(10, parseInt(e.target.value || '0'))) }))}
-                    placeholder="saat" />
-                  <IconButton size="small" onClick={() => adjustSubjectHours(c, -1)} disabled={(selectedSubjects[c] || 0) <= 0}>
-                    <Remove fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" onClick={() => adjustSubjectHours(c, 1)} disabled={(selectedSubjects[c] || 0) >= 10}>
-                    <Add fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" onClick={() => { setCourseList(l => l.filter(x => x !== c)); setSelectedSubjects(prev => { const cp = { ...prev }; delete cp[c]; return cp }) }} color="error">
-                    <Cancel fontSize="small" />
-                  </IconButton>
-                </Stack>
-              ))}
-              {courseList.length === 0 && (
-                <Typography variant="caption" color="text.secondary">Henüz ders eklenmedi</Typography>
-              )}
-            </Stack>
-            {draggingCourse && (
-            <Box onDragOver={allowDrop} onDrop={(e) => { e.preventDefault(); dropToTrash() }}
-                sx={{ mt: 1, p: 1, border: '2px dashed', borderColor: 'error.main', color: 'error.main', borderRadius: 1, textAlign: 'center' }}>
-                Bırak to remove: {draggingCourse}
-              </Box>
-            )}
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" sx={{ mt: 1 }}>
-              <TextField size="small" label="Ders adı" value={courseInput} onChange={(e) => setCourseInput(e.target.value)} />
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>Haftalık Saat</InputLabel>
-                <Select label="Haftalık Saat" value={courseHours} onChange={(e) => setCourseHours(Number(e.target.value))}>
-                  {[1,2,3,4,5,6,7,8,9,10].map(h => <MenuItem key={h} value={h}>{h}</MenuItem>)}
-                </Select>
-              </FormControl>
-              <Button variant="outlined" onClick={() => {
-                const v = courseInput.trim()
-                if (!v || courseHours <= 0) return
-                setSelectedSubjects(prev => ({ ...prev, [v]: (prev[v] || 0) + courseHours }))
-                if (!courseList.includes(v)) setCourseList(l => [...l, v])
-                setCourseInput('')
-                setCourseHours(1)
-              }}>Ekle</Button>
-              <Button variant="text" color="error" onClick={() => { setCourseList([]); setSelectedSubjects({}) }}>Temizle</Button>
-            </Stack>
-          </Box>
+          
           <Box>
             <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Lise Dersleri ve Haftalık Saat</Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -1063,11 +1010,11 @@ function StudySchedule() {
             </Stack>
           </Box>
           {/* Ders Ekle bölümü lise derslerinin altına taşındı */}
-          <Box>
+          <Box sx={{ mt: 2, mb: 2 }}>
             <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Ders Ekle</Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ my: 1 }}>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ my: 2 }}>
               {courseList.map(c => (
-                <Stack key={c} direction="row" spacing={1} alignItems="center" sx={{ p: 1, my: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+                <Stack key={c} direction="row" spacing={1} alignItems="center" sx={{ p: 1, my: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
                   draggable
                   onDragStart={() => onDragStartCourse(c)}
                   onDragEnd={onDragEndCourse}

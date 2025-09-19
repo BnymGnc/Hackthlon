@@ -22,6 +22,7 @@ import SavedSchedule from './pages/SavedSchedule'
 import Settings from './pages/Settings'
 import Chat from './pages/Chat'
 import DailyStudyReport from './pages/DailyStudyReport'
+import ReportHistory from './pages/ReportHistory'
 
 function requireAuth(element: ReactElement) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
@@ -51,6 +52,7 @@ const router = createBrowserRouter([
       { path: 'settings', element: requireAuth(<Settings />) },
       { path: 'chat', element: requireAuth(<Chat />) },
       { path: 'daily-report', element: requireAuth(<DailyStudyReport />) },
+      { path: 'report-history', element: requireAuth(<ReportHistory />) },
     ],
   },
 ])

@@ -20,8 +20,11 @@ function Layout() {
   useEffect(() => {
     async function loadRecent() {
       try {
-        const { data } = await api.get('/api/assessments/')
-        const items = (data || []).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 8)
+        const { data } = await api.get('/api/ai/daily-report/list/')
+        const list = Array.isArray(data) ? data : (data.reports || [])
+        const items = (list || [])
+          .sort((a: any, b: any) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime())
+          .slice(0, 12)
         setRecent(items)
       } catch {}
     }
@@ -35,6 +38,7 @@ function Layout() {
     { to: '/support', label: 'Psikolojik Destek' },
     { to: '/analysis', label: 'Deneme Analizi' },
     { to: '/career', label: 'Kariyer Hedefleri' },
+    { to: '/daily-report', label: 'Günlük Rapor' },
   ]
   const [menuEl, setMenuEl] = useState<null | HTMLElement>(null)
   const menuOpen = Boolean(menuEl)
@@ -73,10 +77,10 @@ function Layout() {
           </Tooltip>
           <Menu anchorEl={anchorEl} id="account-menu" open={open} onClose={handleClose} transformOrigin={{ horizontal: 'right', vertical: 'top' }} anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}>
             <MenuItem onClick={() => { setDrawerOpen(true); handleClose() }}>Geçmiş</MenuItem>
-            <MenuItem component={Link} to="/saved-schedule">Ders Programı</MenuItem>
-            <MenuItem component={Link} to="/daily-report">Günlük Rapor</MenuItem>
-            <MenuItem component={Link} to="/profile">Profil</MenuItem>
-            <MenuItem component={Link} to="/settings">Ayarlar</MenuItem>
+            <MenuItem component={Link} to="/report-history" onClick={handleClose}>Rapor Geçmişi</MenuItem>
+            <MenuItem component={Link} to="/saved-schedule" onClick={handleClose}>Ders Programı</MenuItem>
+            <MenuItem component={Link} to="/profile" onClick={handleClose}>Profil</MenuItem>
+            <MenuItem component={Link} to="/settings" onClick={handleClose}>Ayarlar</MenuItem>
             <MenuItem onClick={() => { localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token'); setDrawerOpen(false); handleClose(); navigate('/login') }}>Çıkış Yap</MenuItem>
           </Menu>
         </Toolbar>

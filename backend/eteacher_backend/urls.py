@@ -55,9 +55,10 @@ urlpatterns = [
     path('api/ai/chat/history/', AIChatHistoryView.as_view(), name='ai_chat_history'),
     path('api/ai/chat/load/<int:chat_id>/', AIChatLoadView.as_view(), name='ai_chat_load'),
     path('api/ai/chat/new/', AIChatNewView.as_view(), name='ai_chat_new'),
-    path('api/ai/daily-report/<str:date>/', AIDailyReportView.as_view(), name='ai_daily_report'),
+    # Order matters: place specific routes BEFORE the dynamic <date> route
     path('api/ai/daily-report/save/', AIDailyReportView.as_view(), name='ai_daily_report_save'),
     path('api/ai/daily-report/analyze/', AIDailyReportAnalyzeView.as_view(), name='ai_daily_report_analyze'),
+    path('api/ai/daily-report/<str:date>/', AIDailyReportView.as_view(), name='ai_daily_report'),
     path('api/ai/target-nets/', TargetNetsView.as_view(), name='ai_target_nets'),
     path('api/ai/per-course-averages/', AIPerCourseAveragesView.as_view(), name='ai_per_course_averages'),
 ]

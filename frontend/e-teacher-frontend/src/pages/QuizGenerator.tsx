@@ -1,13 +1,12 @@
 import { Typography, Paper, Box, TextField, Button, Stack, Drawer, IconButton, List, ListItem, ListItemButton, ListItemText, Divider, Tooltip, Alert, Chip } from '@mui/material'
 import MenuOpenIcon from '@mui/icons-material/MenuOpen'
 import MenuIcon from '@mui/icons-material/Menu'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import api from '../lib/api'
 
 function QuizGenerator() {
   const [drawerOpen, setDrawerOpen] = useState(true)
-  const topics = ['Matematik - Türev', 'Fizik - Kinematik', 'Kimya - Asit Baz', 'Tarih - İnkılaplar']
-  const histories = ['Quiz #12 - Türev', 'Quiz #11 - Kinematik', 'Quiz #10 - Asit Baz']
+  const [availableCourses, setAvailableCourses] = useState<string[]>([])
   const [inputTopics, setInputTopics] = useState('')
   const [numQuestions, setNumQuestions] = useState(10)
   const [difficulty, setDifficulty] = useState('orta')
@@ -16,6 +15,29 @@ function QuizGenerator() {
   const [score, setScore] = useState<number | null>(null)
   const [showResults, setShowResults] = useState(false)
   const [avg, setAvg] = useState<number | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try {
+        // Load last saved schedule to extract course names
+        const { data } = await api.get('/api/ai/schedule/save/')
+        const sched = data?.schedule
+        const courses: string[] = []
+        if (sched?.subjects && typeof sched.subjects === 'object') {
+          for (const k of Object.keys(sched.subjects)) {
+            if (k && !courses.includes(k)) courses.push(k)
+          }
+        }
+        if (Array.isArray(sched?.courses)) {
+          for (const c of sched.courses) if (c && !courses.includes(c)) courses.push(c)
+        }
+        setAvailableCourses(courses)
+      } catch {}
+      try {
+        const { data: stats } = await api.get('/api/assessments-actions/quiz-stats/')
+        setAvg(typeof stats.average === 'number' ? stats.average : null)
+      } catch {}
+    })()
+  }, [])
   const [topicStats, setTopicStats] = useState<{ topic: string, accuracy: number, total: number }[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -84,9 +106,9 @@ function QuizGenerator() {
             <Typography variant="h6">Quiz Geçmişi</Typography>
             <IconButton onClick={() => setDrawerOpen(false)}><MenuOpenIcon /></IconButton>
           </Box>
-          <Typography variant="overline" color="text.secondary">Konu Başlıkları</Typography>
+          <Typography variant="overline" color="text.secondary">Dersler</Typography>
           <List>
-            {topics.map(t => (
+            {(availableCourses.length ? availableCourses : ['Matematik','Fizik','Kimya','Biyoloji','Türkçe','Edebiyat','Tarih','Coğrafya','Felsefe','Din Kültürü','Yabancı Dil']).map(t => (
               <ListItem key={t} disablePadding>
                 <ListItemButton onClick={() => handleTopicClick(t)}>
                   <ListItemText primary={t} />
@@ -94,17 +116,13 @@ function QuizGenerator() {
               </ListItem>
             ))}
           </List>
-          <Divider sx={{ my: 1 }} />
-          <Typography variant="overline" color="text.secondary">Geçmiş Quizler</Typography>
-          <List>
-            {histories.map(h => (
-              <ListItem key={h} disablePadding>
-                <ListItemButton>
-                  <ListItemText primary={h} />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
+          {avg !== null && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="overline" color="text.secondary">Quiz Ortalaması</Typography>
+              <Typography variant="body2" color="text.secondary">{avg}%</Typography>
+            </>
+          )}
         </Box>
       </Drawer>
       <Box sx={{ flex: 1, pl: drawerOpen ? 3 : 0 }}>
@@ -128,7 +146,7 @@ function QuizGenerator() {
                 ))}
               </Stack>
             )}
-            <Typography variant="body1">Konu başlıklarını yaz; otomatik quiz soruları üretelim.</Typography>
+            <Typography variant="body1">Ders/Konu başlığını yaz; otomatik quiz soruları üretelim.</Typography>
             <TextField label="Konu Başlıkları" multiline minRows={3} fullWidth value={inputTopics} onChange={(e) => setInputTopics(e.target.value)} />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField label="Soru Sayısı" type="number" inputProps={{ min: 1, max: 50 }} value={numQuestions} onChange={(e) => setNumQuestions(parseInt(e.target.value || '0'))} />

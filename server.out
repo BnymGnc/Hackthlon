@@ -1,0 +1,21 @@
+
+> e-teacher-frontend@0.0.0 dev
+> vite --host
+
+Port 5173 is in use, trying another one...
+
+  [32m[1mVITE[22m v7.1.5[39m  [2mready in [0m[1m648[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5174[22m/[39m
+  [32m➜[39mPerforming system checks...
+
+System check identified no issues (0 silenced).
+September 18, 2025 - 16:09:25
+Django version 4.2, using settings 'eteacher_backend.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CTRL-BREAK.
+
+Performing system checks...
+
+Performing system checks...
+
